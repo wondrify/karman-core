@@ -150,6 +150,7 @@ class S3StorageProvider extends StorageProvider {
         proxyUser = options.proxyUser ?: proxyUser
         proxyPassword = options.proxyPassword ?: proxyPassword
         proxyDomain = options.proxyDomain ?: proxyDomain
+        noProxy = options.noProxy ?: noProxy
         proxyWorkstation = options.proxyWorkstation ?: proxyWorkstation
         chunkSize = options.chunkSize ?: chunkSize
 		tempDir = options.tempDir ?: tempDir
