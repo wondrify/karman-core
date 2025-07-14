@@ -12,7 +12,7 @@ apply plugin: 'groovy'
 apply plugin: 'idea'
 apply plugin: 'java-library'
 
-group = 'com.bertramlabs.plugins'
+group = 'cloud.wondrify'
 
 
 repositories {
