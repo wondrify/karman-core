@@ -126,12 +126,9 @@ class NfsCloudFile extends CloudFile{
 
 	@CompileStatic
 	private copyStream(InputStream source, OutputStream out) {
+
 		try {
-			byte[] buffer = new byte[8192*2];
-			int len;
-			while ((len = source.read(buffer)) != -1) {
-				out.write(buffer, 0, len);
-			}
+			source.transferTo(out)
 		} finally {
 			try {
 				out.flush()
