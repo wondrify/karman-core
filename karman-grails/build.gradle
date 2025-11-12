@@ -16,12 +16,8 @@ buildscript {
 
 group "cloud.wondrify"
 
-apply plugin: "org.grails.grails-plugin"
-apply plugin: "org.grails.grails-gsp"
 apply plugin: 'maven-publish'
 apply plugin: 'java-library'
-apply plugin: 'eclipse'
-apply plugin: 'idea'
 apply plugin: 'org.apache.grails.gradle.grails-publish'
 
 ext {
@@ -47,12 +43,8 @@ dependencies {
   compileOnly "org.grails:grails-web-boot"
   compileOnly "org.grails:grails-dependencies"
   runtimeOnly 'javax.servlet:javax.servlet-api:3.1.0'
-
   testImplementation "org.grails:grails-plugin-testing"
-
-  console "org.grails:grails-console"
   api project(':karman-core')
-
 }
 bootJar.enabled = false
 
