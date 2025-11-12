@@ -4,10 +4,10 @@ buildscript {
     }
     repositories {
         mavenLocal()
-        maven { url "https://repo.grails.org/grails/core" }
+        mavenCentral()
     }
     dependencies {
-        classpath "org.grails:grails-gradle-plugin:$grailsGradlePluginVersion"
+        classpath "org.apache.grails:grails-gradle-plugins:$grailsGradlePluginVersion"
     }
 }
 
@@ -30,7 +30,7 @@ ext {
 repositories {
   mavenLocal()
   mavenCentral()
-  maven { url "https://repo.grails.org/grails/core" }
+
 }
 
 configurations {
