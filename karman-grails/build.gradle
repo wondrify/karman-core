@@ -3,11 +3,13 @@ buildscript {
       grailsVersion = project.grailsVersion
     }
     repositories {
-        mavenLocal()
-        mavenCentral()
+      mavenLocal()
+      mavenCentral()
+      maven { url "https://plugins.gradle.org/m2/" }
     }
     dependencies {
-        classpath "org.apache.grails:grails-gradle-plugins:$grailsGradlePluginVersion"
+      classpath "org.apache.grails:grails-gradle-plugins:$grailsGradlePluginVersion"
+      classpath "org.apache.grails.gradle:grails-publish:0.0.2"
     }
 }
 
@@ -20,7 +22,7 @@ apply plugin: 'maven-publish'
 apply plugin: 'java-library'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
-// apply plugin: "org.grails.grails-plugin-publish"
+apply plugin: 'org.apache.grails.gradle.grails-publish'
 
 ext {
   grailsVersion = project.grailsVersion
@@ -89,38 +91,6 @@ publishing {
             from components.java
         }
     }
-    repositories {
-        maven {
-            if( !isReleaseVersion ) {
-                url = "http://nexus.bertramlabs.com/content/repositories/snapshots"
-                if(project.hasProperty('labsNexusUser')) {
-                    credentials {
-                        username = labsNexusUser
-                        password = labsNexusPassword
-                    }
-                }
-            }
-        }
-    }
-}
 
-java {
-    withSourcesJar()
-    withJavadocJar()
 }
-
-// grailsPublish {
-//   if(project.hasProperty('bintrayUser')) {
-//     user = bintrayUser
-//     key = bintrayKey
-//   }
-//   userOrg = 'bertramlabs'
-//     githubSlug = 'bertramdev/karman-core'
-//     license {
-//         name = 'Apache-2.0'
-//     }
-//     title = "Karman"
-//     desc = "Karman is a standardized / extensible interface plugin for dealing with various cloud services including Local, S3, and Openstack."
-//     developers = [davydotcom:"David Estes", bdwheeler: "Brian Wheeler"]
-// }
 
