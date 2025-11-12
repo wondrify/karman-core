@@ -16,7 +16,7 @@ apply plugin: 'groovy'
 apply plugin: 'idea'
 apply plugin: 'maven-publish'
 
-group = 'com.bertramlabs.plugins'
+group = 'cloud.wondrify'
 
 ext.isReleaseVersion = !version.endsWith("SNAPSHOT")
 

@@ -14,7 +14,7 @@ apply plugin: 'idea'
 apply plugin: 'maven-publish'
 apply plugin: 'java-library'
 
-group = 'com.bertramlabs.plugins'
+group = 'cloud.wondrify'
 
 
 repositories {
