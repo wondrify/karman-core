@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - '[4-9]+.[0-9]+.x'
+      - 'master'
   pull_request:
 jobs:
   build:
