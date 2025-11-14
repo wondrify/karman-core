@@ -1,0 +1,15 @@
+compileJava.options.release = javaVersion.toInteger()
+
+extensions.configure(JavaPluginExtension) {
+	// Explicit `it` is required here
+	it.withJavadocJar()
+	it.withSourcesJar()
+}
+
+tasks.withType(Jar).configureEach {
+	manifest.attributes(
+					'Implementation-Title': 'Karman',
+					'Implementation-Version': project.version,
+					'Implementation-Vendor': "${project.group}:${findProperty('pomArtifactId') ?: project.name}"
+	)
+}

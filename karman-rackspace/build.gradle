@@ -1,32 +1,15 @@
-
-buildscript {
-    repositories {
-        mavenLocal()
-        mavenCentral()
-    }
-    dependencies {
-    }
-}
-
-
 apply plugin: 'groovy'
-apply plugin: 'idea'
-apply plugin: 'maven-publish'
 apply plugin: 'java-library'
 
 group = 'cloud.wondrify'
 
-
-repositories {
-    mavenLocal()
-    mavenCentral()
+ext {
+    pomDescription = "Karman Storage Provider interface for rackspace cloud files api"
 }
-
 
 configurations {
     provided
 }
- 
 sourceSets {
     main {
         compileClasspath += configurations.provided
@@ -41,60 +24,6 @@ dependencies {
 
 }
 
-publishing {
-    publications {
-        maven(MavenPublication) {
-            artifactId 'karman-rackspace'
-            pom.withXml {
-                asNode().children().last() + {
-                    resolveStrategy = Closure.DELEGATE_FIRST
-                    name 'karman-rackspace'
-                    description 'Karman Storage Provider interface for rackspace cloud files api'
-                    url 'https://github.com/bertramdev/karman-core'
-                    scm {
-                        url 'https://github.com/bertramdev/karman-rackspace'
-                        connection 'scm:https://bertramdev@github.com/bertramdev/karman-core.git'
-                        developerConnection 'scm:git://github.com/bertramdev/karman-core.git'
-                    }
-                    licenses {
-                        license {
-                            name 'The Apache Software License, Version 2.0'
-                            url 'http://www.apache.org/license/LICENSE-2.0.txt'
-                            distribution 'repo'
-                        }
-                    }
-                    developers {
-                        developer {
-                            id 'davydotcom'
-                            name 'David Estes'
-                            email 'davydotcom@gmail.com'
-                        }
-                    }
-                }
-            }
-            from components.java
-        }
-    }
-    repositories {
-        maven {
-            if( !isReleaseVersion ) {
-                url = "http://nexus.bertramlabs.com/content/repositories/snapshots"
-                if(project.hasProperty('labsNexusUser')) {
-                    credentials {
-                        username = labsNexusUser
-                        password = labsNexusPassword
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-java {
-    withSourcesJar()
-    withJavadocJar()
-}
 
 task(console, dependsOn: 'classes', type: JavaExec) {
   main = 'groovy.ui.Console'
@@ -106,4 +35,9 @@ test {
         exceptionFormat = 'full'
         showStandardStreams = true
     }
+}
+
+apply {
+    from rootProject.layout.projectDirectory.file('gradle/java-config.gradle')
+    from rootProject.layout.projectDirectory.file('gradle/publish-config.gradle')
 }

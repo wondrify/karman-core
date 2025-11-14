@@ -1,88 +1,40 @@
-buildscript {
-    ext {
-      grailsVersion = project.grailsVersion
-    }
-    repositories {
-      mavenLocal()
-      mavenCentral()
-      maven { url "https://plugins.gradle.org/m2/" }
-    }
-    dependencies {
-      classpath "org.apache.grails:grails-gradle-plugins:$grailsGradlePluginVersion"
-      classpath "org.apache.grails.gradle:grails-publish:0.0.2"
-    }
-}
 
 
 group "cloud.wondrify"
 
-apply plugin: 'maven-publish'
+apply plugin: 'groovy'
 apply plugin: 'java-library'
-apply plugin: 'org.apache.grails.gradle.grails-publish'
+apply plugin: "org.apache.grails.gradle.grails-plugin"
 
 ext {
   grailsVersion = project.grailsVersion
+  pomDescription = 'Karman Storage Provider Asset Serving Plugin for Grails'
 }
 
-
-repositories {
-  mavenLocal()
-  mavenCentral()
-
-}
 
 configurations {
   provided
 }
+
 dependencies {
   compileOnly 'org.springframework.boot:spring-boot-starter-logging'
   compileOnly "org.springframework.boot:spring-boot-starter-actuator"
   compileOnly "org.springframework.boot:spring-boot-autoconfigure"
   compileOnly "org.springframework.boot:spring-boot-starter-tomcat"
-
-  compileOnly "org.grails:grails-web-boot"
-  compileOnly "org.grails:grails-dependencies"
+  compileOnly "org.apache.grails:grails-core"
+  compileOnly "org.apache.grails:grails-web-boot"
+  compileOnly "org.apache.grails:grails-services"
+  compileOnly "org.apache.grails:grails-url-mappings"
   runtimeOnly 'javax.servlet:javax.servlet-api:3.1.0'
-  testImplementation "org.grails:grails-plugin-testing"
+  testImplementation "org.spockframework:spock-core"
+  testImplementation "org.apache.grails:grails-testing-support-web"
   api project(':karman-core')
 }
 bootJar.enabled = false
 
 
-publishing {
-    publications {
-        maven(MavenPublication) {
-            artifactId 'karman-grails'
-            pom.withXml {
-                asNode().children().last() + {
-                    resolveStrategy = Closure.DELEGATE_FIRST
-                    name 'karman-grails'
-                    description 'Karman Storage Provider Asset Serving Plugin for Grails'
-                    url 'https://github.com/bertramdev/karman-core'
-                    scm {
-                        url 'https://github.com/bertramdev/karman-core'
-                        connection 'scm:https://bertramdev@github.com/bertramdev/karman-core.git'
-                        developerConnection 'scm:git://github.com/bertramdev/karman-core.git'
-                    }
-                    licenses {
-                        license {
-                            name 'The Apache Software License, Version 2.0'
-                            url 'http://www.apache.org/license/LICENSE-2.0.txt'
-                            distribution 'repo'
-                        }
-                    }
-                    developers {
-                        developer {
-                            id 'davydotcom'
-                            name 'David Estes'
-                            email 'destes@bcap.com'
-                        }
-                    }
-                }
-            }
-            from components.java
-        }
-    }
 
+apply {
+  from rootProject.layout.projectDirectory.file('gradle/java-config.gradle')
+  from rootProject.layout.projectDirectory.file('gradle/publish-config.gradle')
 }
-

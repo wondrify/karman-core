@@ -1,69 +1,19 @@
-buildscript {
-    repositories {
-        mavenLocal()
-        mavenCentral()
-    }
-    dependencies {
-    }
-}
-
 apply plugin: 'groovy'
-apply plugin: 'idea'
-apply plugin: 'maven-publish'
 apply plugin: 'java-library'
 
-group = 'cloud.wondrify'
-
-
-
-repositories {
-    mavenLocal()
-	mavenCentral()
+ext {
+    pomDescription = 'Karman is a standardized Cloud File Management Interface for Groovy. It provides a unified means and simple DSL for accessing files on the cloud via extensible StorageProviders'
 }
 
+configurations {
+    provided
+    doc.extendsFrom(runtime)
+}
 
 dependencies {
-	implementation "org.apache.groovy:groovy-all:$groovyVersion"
+    implementation "org.apache.groovy:groovy-all:$groovyVersion"
     api("commons-logging:commons-logging:1.1.1")
     testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
-
-}
-
-publishing {
-    publications {
-        maven(MavenPublication) {
-            artifactId 'karman-core'
-            pom.withXml {
-                asNode().children().last() + {
-                    resolveStrategy = Closure.DELEGATE_FIRST
-                    name 'karman-core'
-                    description 'Karman is a standardized Cloud File Management Interface for Groovy. It provides a unified means and simple DSL for accessing files on the cloud via extensible StorageProviders'
-                    url 'https://github.com/bertramdev/karman-core'
-                    scm {
-                        url 'https://github.com/bertramdev/karman-core'
-                        connection 'scm:https://bertramdev@github.com/bertramdev/karman-core.git'
-                        developerConnection 'scm:git://github.com/bertramdev/karman-core.git'
-                    }
-                    licenses {
-                        license {
-                            name 'The Apache Software License, Version 2.0'
-                            url 'http://www.apache.org/license/LICENSE-2.0.txt'
-                            distribution 'repo'
-                        }
-                    }
-                    developers {
-                        developer {
-                            id 'davydotcom'
-                            name 'David Estes'
-                            email 'davydotcom@gmail.com'
-                        }
-                    }
-                }
-            }
-            from components.java
-        }
-    }
-
 }
 
 
@@ -84,4 +34,9 @@ test {
         exceptionFormat = 'full'
         showStandardStreams = true
     }
+}
+
+apply {
+    from rootProject.layout.projectDirectory.file('gradle/java-config.gradle')
+    from rootProject.layout.projectDirectory.file('gradle/publish-config.gradle')
 }

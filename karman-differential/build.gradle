@@ -1,25 +1,19 @@
-buildscript {
-	repositories {
-		mavenLocal()
-		mavenCentral()
-	}
-	dependencies {
-	}
-}
-
-
-
 apply plugin: 'groovy'
-apply plugin: 'idea'
-apply plugin: 'maven-publish'
 apply plugin: 'java-library'
 
 group = 'cloud.wondrify'
 
+ext {
+	pomDescription = 'Karman Storage Provider interface for differential file storage'
+}
 
-repositories {
-	mavenLocal()
-	mavenCentral()
+configurations {
+	provided
+}
+sourceSets {
+	main {
+		compileClasspath += configurations.provided
+	}
 }
 
 dependencies {
@@ -27,66 +21,6 @@ dependencies {
 	api project(':karman-core')
 	testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
 
-}
-
-publishing {
-	publications {
-		maven(MavenPublication) {
-			artifactId 'karman-differential'
-			pom.withXml {
-				asNode().children().last() + {
-					resolveStrategy = Closure.DELEGATE_FIRST
-					name 'karman-differential'
-					description 'Karman Storage Provider interface for differential file storage'
-					url 'https://github.com/bertramdev/karman-core'
-					scm {
-						url 'https://github.com/bertramdev/karman-core'
-						connection 'scm:https://bertramdev@github.com/bertramdev/karman-core.git'
-						developerConnection 'scm:git://github.com/bertramdev/karman-core.git'
-					}
-					licenses {
-						license {
-							name 'The Apache Software License, Version 2.0'
-							url 'http://www.apache.org/license/LICENSE-2.0.txt'
-							distribution 'repo'
-						}
-					}
-					developers {
-						developer {
-							id 'davydotcom'
-							name 'David Estes'
-							email 'davydotcom@gmail.com'
-						}
-						developer {
-							id 'bwheeler'
-							name 'Brian Wheeler'
-							email 'bwheeler@bcap.com'
-						}
-					}
-				}
-			}
-			from components.java
-		}
-	}
-	repositories {
-		maven {
-			if( !isReleaseVersion ) {
-				url = "http://nexus.bertramlabs.com/content/repositories/snapshots"
-				if(project.hasProperty('labsNexusUser')) {
-					credentials {
-						username = labsNexusUser
-						password = labsNexusPassword
-					}
-				}
-			}
-		}
-	}
-}
-
-
-java {
-	withSourcesJar()
-	withJavadocJar()
 }
 
 task(console, dependsOn: 'classes', type: JavaExec) {
@@ -102,3 +36,7 @@ test {
 	}
 }
 
+apply {
+	from rootProject.layout.projectDirectory.file('gradle/java-config.gradle')
+	from rootProject.layout.projectDirectory.file('gradle/publish-config.gradle')
+}

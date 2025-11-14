@@ -1,30 +1,20 @@
-buildscript {
-    repositories {
-        mavenLocal()
-        mavenCentral()
-    }
-    dependencies {
-    }
-}
-
-
-
 apply plugin: 'groovy'
-apply plugin: 'idea'
-apply plugin: 'maven-publish'
 apply plugin: 'java-library'
 
 group = 'cloud.wondrify'
 
-ext.isReleaseVersion = !version.endsWith("SNAPSHOT")
-
-
-
-repositories {
-    mavenLocal()
-    mavenCentral()
+ext {
+    pomDescription = 'Karman Storage Provider interface for Azure Cloud Storage api'
 }
 
+configurations {
+    provided
+}
+sourceSets {
+    main {
+        compileClasspath += configurations.provided
+    }
+}
 
 dependencies {
     implementation "org.apache.groovy:groovy-all:$groovyVersion"
@@ -38,60 +28,6 @@ dependencies {
     api 'commons-beanutils:commons-beanutils:1.9.4'
 }
 
-publishing {
-    publications {
-        maven(MavenPublication) {
-            artifactId 'karman-azure'
-            pom.withXml {
-                asNode().children().last() + {
-                    resolveStrategy = Closure.DELEGATE_FIRST
-                    name 'karman-azure'
-                    description 'Karman Storage Provider interface for Azure Cloud Storage api'
-                    url 'https://github.com/bertramdev/karman-core'
-                    scm {
-                        url 'https://github.com/bertramdev/karman-core'
-                        connection 'scm:https://bertramdev@github.com/bertramdev/karman-core.git'
-                        developerConnection 'scm:git://github.com/bertramdev/karman-core.git'
-                    }
-                    licenses {
-                        license {
-                            name 'The Apache Software License, Version 2.0'
-                            url 'http://www.apache.org/license/LICENSE-2.0.txt'
-                            distribution 'repo'
-                        }
-                    }
-                    developers {
-                        developer {
-                            id 'bwhiton'
-                            name 'Bob Whiton'
-                            email 'bwhiton@bcap.com'
-                        }
-                    }
-                }
-            }
-            from components.java
-        }
-    }
-    repositories {
-        maven {
-            if( !isReleaseVersion ) {
-                url = "http://nexus.bertramlabs.com/content/repositories/snapshots"
-                if(project.hasProperty('labsNexusUser')) {
-                    credentials {
-                        username = labsNexusUser
-                        password = labsNexusPassword
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-java {
-    withSourcesJar()
-    withJavadocJar()
-}
 
 task(console, dependsOn: 'classes', type: JavaExec) {
   main = 'groovy.ui.Console'
@@ -105,4 +41,8 @@ test {
         showStandardStreams = true
         events 'started', 'passed'
     }
+}
+apply {
+    from rootProject.layout.projectDirectory.file('gradle/java-config.gradle')
+    from rootProject.layout.projectDirectory.file('gradle/publish-config.gradle')
 }
