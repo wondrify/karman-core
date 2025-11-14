@@ -44,6 +44,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       - name: "📤 Publish Snapshot"
         run: >
+          echo Username: $MAVEN_PUBLISH_USERNAME
           ./gradlew publish
         env:
           GRAILS_PUBLISH_RELEASE: 'false'
