@@ -17,6 +17,16 @@ sourceSets {
     }
 }
 
+dependencies {
+    implementation "org.apache.groovy:groovy-all:$groovyVersion"
+    api project(':karman-core')
+    testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
+    api 'org.apache.httpcomponents:httpcore:4.4.16'
+    api 'org.apache.httpcomponents:httpclient:4.5.14'
+    api 'com.amazonaws:aws-java-sdk:1.11.471'
+    api group: 'commons-beanutils', name: 'commons-beanutils', version: '1.9.4'
+}
+
 
 
 task(console, dependsOn: 'classes', type: JavaExec) {

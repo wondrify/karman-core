@@ -11,7 +11,13 @@ configurations {
 }
 
 dependencies {
-    implementation "org.apache.groovy:groovy-all:$groovyVersion"
+    doc "org.apache.groovy:groovy:$groovyVersion"
+    doc "org.apache.groovy:groovy-ant:$groovyVersion"
+    doc "org.apache.groovy:groovy-templates:$groovyVersion"
+    doc "com.github.javaparser:javaparser-core:$javaparserVersion"
+
+    compileOnly "org.apache.groovy:groovy:$groovyVersion"
+    compileOnly "org.apache.groovy:groovy-all:$groovyVersion"
     api("commons-logging:commons-logging:1.1.1")
     testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
 }
@@ -34,6 +40,15 @@ test {
         exceptionFormat = 'full'
         showStandardStreams = true
     }
+}
+tasks.named('groovydoc', Groovydoc).configure { Groovydoc it ->
+    it.docTitle "Asset Pipeline Core"
+    it.windowTitle "Asset Pipeline For the JVM API Doc"
+    it.groovyClasspath = configurations.doc
+    it.classpath = configurations.runtime
+    // Links to external Javadoc, currently only the J2SE links are working properly
+    it.link('http://download.oracle.com/javase/8/docs/api/', 'java.', 'org.xml', 'javax.', 'org.xml.')
+    it.link('http://groovy.codehaus.org/api/', 'groovy.', 'org.apache.groovy.')
 }
 
 apply {
