@@ -6,6 +6,10 @@ extensions.configure(JavaPluginExtension) {
 	it.withSourcesJar()
 }
 
+tasks.named('javadocJar', Jar) {
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 tasks.withType(Jar).configureEach {
 	manifest.attributes(
 					'Implementation-Title': 'Karman',

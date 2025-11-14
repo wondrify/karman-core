@@ -1,6 +1,8 @@
 apply plugin: 'groovy'
 apply plugin: 'java-library'
 
+group = 'cloud.wondrify'
+
 ext {
     pomDescription = 'Karman is a standardized Cloud File Management Interface for Groovy. It provides a unified means and simple DSL for accessing files on the cloud via extensible StorageProviders'
 }
