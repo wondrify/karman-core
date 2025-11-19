@@ -35,7 +35,7 @@ public class DifferentialCloudFile extends CloudFile {
 	@Override
 	@CompileStatic
 	InputStream getInputStream() {
-		CloudFile manifestFile = parent.sourceDirectory[sourceFile.name + "/karman.diff"]
+		CloudFileInterface manifestFile = parent.sourceDirectory[sourceFile.name + "/karman.diff"]
 		if(manifestFile.exists()) {
 			//we need to copy the index table to local storage for read in case of slow connections
 			Path localManifestCache = Files.createTempFile("karman",".diff")

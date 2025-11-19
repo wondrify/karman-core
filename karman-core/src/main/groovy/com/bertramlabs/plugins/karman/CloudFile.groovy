@@ -168,4 +168,8 @@ abstract class CloudFile implements CloudFileInterface {
 	boolean supportsRangeBasedInputStream() {
 		return false
 	}
+
+	// to satisfy the groovy static typechecker since we don't have a default impl
+	// for the parameterless variant
+	abstract InputStream getInputStream()
 }
