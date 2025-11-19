@@ -190,4 +190,19 @@ class NfsCloudFile extends CloudFile{
 		log.warn("Karman CloudFile Meta Attributes Not Available for NfsCloudFile")
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	boolean supportsRangeBasedInputStream() {
+		return true
+	}
+
+	@Override
+	InputStream getInputStream(long offset, long length) {
+		if(baseFile.exists()) {
+			return new NfsFileInputStream(baseFile, offset)
+		}
+		return null
+	}
 }
