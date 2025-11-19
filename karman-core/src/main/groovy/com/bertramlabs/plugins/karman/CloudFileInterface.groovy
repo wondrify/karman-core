@@ -29,6 +29,9 @@ interface CloudFileInterface {
 	URL getURL()
 
 	InputStream getInputStream()
+	default InputStream getInputStream(long offset,long length) {
+		throw new IllegalArgumentException("Not supported by this provider")
+	}
 	void setInputStream(InputStream is)
 	OutputStream getOutputStream()
 
@@ -72,4 +75,10 @@ interface CloudFileInterface {
 	def getMetaAttributes()
 
 	void removeMetaAttribute(key)
+
+	default boolean isChunkable() {
+		return false
+	}
+
+
 }
