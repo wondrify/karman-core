@@ -29,9 +29,17 @@ interface CloudFileInterface {
 	URL getURL()
 
 	InputStream getInputStream()
-	default InputStream getInputStream(long offset,long length) {
-		throw new IllegalArgumentException("Not supported by this provider")
-	}
+
+	/**
+	 * Returns an input stream over a range of bytes of the CloudFile specified by offset and length.
+	 *
+	 * Note: Mark support for this by overriding {@link CloudFileInterface#supportsRangeBasedInputStream} to return true.
+	 * @param offset the offset this stream will start at in the CloudFile
+	 * @param length the total length of this chunk in the CloudFile
+	 * @return ranged input stream
+	 */
+	InputStream getInputStream(long offset,long length)
+
 	void setInputStream(InputStream is)
 	OutputStream getOutputStream()
 
@@ -76,9 +84,9 @@ interface CloudFileInterface {
 
 	void removeMetaAttribute(key)
 
-	default boolean isChunkable() {
-		return false
-	}
-
-
+	/**
+	 * Indicates if we support range based input streams via {@link CloudFileInterface#getInputStream(long, long)}
+	 * @return True if this CloudFile supports range based input streams
+	 */
+	boolean supportsRangeBasedInputStream()
 }

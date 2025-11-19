@@ -159,6 +159,13 @@ abstract class CloudFile implements CloudFileInterface {
 		}
 	}
 
+	@Override
+	InputStream getInputStream(long offset, long length) {
+		throw new UnsupportedOperationException('Range based input streams are not supported.')
+	}
 
-
+	@Override
+	boolean supportsRangeBasedInputStream() {
+		return false
+	}
 }
