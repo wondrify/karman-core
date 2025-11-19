@@ -31,10 +31,7 @@ import org.apache.http.auth.AuthScope
 import org.apache.http.auth.NTCredentials
 import org.apache.http.client.CredentialsProvider
 import org.apache.http.client.HttpClient
-import org.apache.http.client.methods.HttpDelete
 import org.apache.http.client.methods.HttpGet
-import org.apache.http.client.methods.HttpHead
-import org.apache.http.client.methods.HttpPut
 import org.apache.http.client.utils.URIBuilder
 import org.apache.http.config.MessageConstraints
 import org.apache.http.config.Registry
@@ -47,11 +44,8 @@ import org.apache.http.conn.socket.ConnectionSocketFactory
 import org.apache.http.conn.socket.PlainConnectionSocketFactory
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory
 import org.apache.http.conn.ssl.X509HostnameVerifier
-import org.apache.http.entity.InputStreamEntity
-import org.apache.http.entity.StringEntity
 import org.apache.http.impl.DefaultHttpResponseFactory
 import org.apache.http.impl.client.BasicCredentialsProvider
-import org.apache.http.impl.client.DefaultHttpClient
 import org.apache.http.impl.client.HttpClientBuilder
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.client.ProxyAuthenticationStrategy
@@ -67,13 +61,10 @@ import org.apache.http.io.SessionInputBuffer
 import org.apache.http.message.BasicHeader
 import org.apache.http.message.BasicLineParser
 import org.apache.http.message.LineParser
-import org.apache.http.params.HttpConnectionParams
-import org.apache.http.params.HttpParams
 import org.apache.http.protocol.HttpContext
 import org.apache.http.ssl.SSLContexts
 import org.apache.http.util.CharArrayBuffer
-import org.apache.commons.beanutils.PropertyUtils;
-import org.apache.http.util.EntityUtils
+import org.apache.commons.beanutils.PropertyUtils
 
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSession
@@ -81,7 +72,6 @@ import javax.net.ssl.SSLSocket
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 import java.lang.reflect.InvocationTargetException
-import java.net.URLEncoder
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 
@@ -224,10 +214,17 @@ class S3CloudFile extends CloudFile {
 	 * @return inputStream
 	 */
 	InputStream getInputStream() {
-		if(provider.baseUrls && provider.baseUrls[parent.name]) {
+		return getInputStreamInternal()
+	}
+
+	private BufferedInputStream getInputStreamInternal(Long offset = null, Long length = null) {
+		if (provider.baseUrls && provider.baseUrls[parent.name]) {
 			//if we are using a custom base url to fetch it like a cloudfront edge server
 			URIBuilder uriBuilder = new URIBuilder("${provider.baseUrls[parent.name]}/${encodedName}".toString())
 			HttpGet request = new HttpGet(uriBuilder.build())
+			if (offset && length) {
+				request.addHeader('Range', "bytes=$offset-${offset+length}")
+			}
 			HttpClientBuilder clientBuilder = HttpClients.custom()
 			clientBuilder.setHostnameVerifier(new X509HostnameVerifier() {
 				public boolean verify(String host, SSLSession sess) {
@@ -252,15 +249,15 @@ class S3CloudFile extends CloudFile {
 			SSLConnectionSocketFactory sslConnectionFactory = new SSLConnectionSocketFactory(sslcontext) {
 				@Override
 				public Socket connectSocket(int connectTimeout, Socket socket, HttpHost host, InetSocketAddress remoteAddress, InetSocketAddress localAddress, HttpContext context) throws IOException, ConnectTimeoutException {
-					if(socket instanceof SSLSocket) {
+					if (socket instanceof SSLSocket) {
 						try {
 							socket.setEnabledProtocols(['SSLv3', 'TLSv1', 'TLSv1.1', 'TLSv1.2'] as String[])
 							PropertyUtils.setProperty(socket, "host", host.getHostName());
-						} catch(NoSuchMethodException ex) {
+						} catch (NoSuchMethodException ex) {
 						}
-						catch(IllegalAccessException ex) {
+						catch (IllegalAccessException ex) {
 						}
-						catch(InvocationTargetException ex) {
+						catch (InvocationTargetException ex) {
 						}
 					}
 					return super.connectSocket(30000, socket, host, remoteAddress, localAddress, context)
@@ -283,12 +280,12 @@ class S3CloudFile extends CloudFile {
 
 					};
 					return new DefaultHttpResponseParser(
-						ibuffer, lineParser, DefaultHttpResponseFactory.INSTANCE, constraints ?: MessageConstraints.DEFAULT) {
+							ibuffer, lineParser, DefaultHttpResponseFactory.INSTANCE, constraints ?: MessageConstraints.DEFAULT) {
 
 						@Override
 						protected boolean reject(final CharArrayBuffer line, int count) {
 							//We need to break out of forever head reads
-							if(count > 100) {
+							if (count > 100) {
 								return true
 							}
 							return false;
@@ -301,25 +298,25 @@ class S3CloudFile extends CloudFile {
 			};
 			clientBuilder.setSSLSocketFactory(sslConnectionFactory)
 			Registry<ConnectionSocketFactory> registry = RegistryBuilder.<ConnectionSocketFactory> create()
-				.register("https", sslConnectionFactory)
-				.register("http", PlainConnectionSocketFactory.INSTANCE)
-				.build();
+					.register("https", sslConnectionFactory)
+					.register("http", PlainConnectionSocketFactory.INSTANCE)
+					.build();
 
 			HttpMessageWriterFactory<HttpRequest> requestWriterFactory = new DefaultHttpRequestWriterFactory();
 
 			HttpConnectionFactory<HttpRoute, ManagedHttpClientConnection> connFactory = new ManagedHttpClientConnectionFactory(
-				requestWriterFactory, responseParserFactory);
+					requestWriterFactory, responseParserFactory);
 			BasicHttpClientConnectionManager connectionManager = new BasicHttpClientConnectionManager(registry, connFactory)
 
 			clientBuilder.setConnectionManager(connectionManager)
 
 			//Proxy Settings
-			if(provider.proxyHost) {
+			if (provider.proxyHost) {
 				clientBuilder.setProxy(new HttpHost(provider.proxyHost, provider.proxyPort))
-				if(provider.proxyUser) {
+				if (provider.proxyUser) {
 					CredentialsProvider credsProvider = new BasicCredentialsProvider();
 					NTCredentials ntCreds = new NTCredentials(provider.proxyUser, provider.proxyPassword, provider.proxyWorkstation, provider.proxyDomain)
-					credsProvider.setCredentials(new AuthScope(provider.proxyHost,provider.proxyPort), ntCreds)
+					credsProvider.setCredentials(new AuthScope(provider.proxyHost, provider.proxyPort), ntCreds)
 
 					clientBuilder.setDefaultCredentialsProvider(credsProvider)
 					clientBuilder.setProxyAuthenticationStrategy(new ProxyAuthenticationStrategy())
@@ -331,7 +328,7 @@ class S3CloudFile extends CloudFile {
 			HttpEntity entity = response.getEntity()
 			return new BufferedInputStream(entity.content, 8000)
 		} else {
-			loadObject()
+			loadObject(offset, length)
 			return new BufferedInputStream(s3Object.objectContent, 8000)
 		}
 	}
@@ -535,9 +532,13 @@ class S3CloudFile extends CloudFile {
 		object
 	}
 
-	private void loadObject() {
+	private void loadObject(Long offset = null, Long length = null) {
 		if(valid) {
-			object = s3Client.getObject(parent.name, name)
+			def req = new GetObjectRequest(parent.name, name)
+			if (offset && length) {
+				req.setRange(offset, offset+length)
+			}
+			object = s3Client.getObject(req)
 			loaded = true
 			metaDataLoaded = false
 		}
@@ -579,5 +580,21 @@ class S3CloudFile extends CloudFile {
 		] as TrustManager[]
 		// set up a TrustManager that trusts everything
 		sslContext.init(null, trustAllCerts, new SecureRandom());
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	boolean supportsRangeBasedInputStream() {
+		return true
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	InputStream getInputStream(long offset, long length) {
+		getInputStreamInternal(offset, length)
 	}
 }
