@@ -116,6 +116,29 @@ public class NfsFileInputStream extends InputStream {
 
     /**
      * Creates a <code>NfsFileInputStream</code> by opening a connection to an
+     * actual NFS file, using the specified <code>offset</code> and
+     * <code>maximumBufferSize</code>.
+     * <p>
+     * If the named file does not exist, is a directory rather than a regular
+     * file, or for some other reason cannot be opened for reading then a
+     * <code>FileNotFoundException</code> is thrown.
+     * </p>
+     *
+     * @param nfsFile
+     *            The NFS file instance to be read.
+     * @param offset
+     *            The offset at which reading should start, in bytes.
+     * @throws IOException
+     *             If the file does not exist, is a directory rather than a
+     *             regular file, or for some other reason cannot be opened for
+     *             reading.
+     */
+    public NfsFileInputStream(NfsFile<?, ?> nfsFile, long offset) throws IOException {
+        this(nfsFile, offset, (int) Math.min(nfsFile.fsinfo().getFsInfo().rtpref, Integer.MAX_VALUE));
+    }
+
+    /**
+     * Creates a <code>NfsFileInputStream</code> by opening a connection to an
      * actual NFS file, starting to read at offset 0 and using the specified
      * maximum buffer size.
      * <p>

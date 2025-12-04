@@ -151,6 +151,13 @@ class S3StorageProvider extends StorageProvider {
         proxyPassword = options.proxyPassword ?: proxyPassword
         proxyDomain = options.proxyDomain ?: proxyDomain
         noProxy = options.noProxy ?: noProxy
+		if (noProxy) {
+			// aws sdk doesn't support `,` as a separator in no proxy, they follow the standard
+			// for java 'http.nonProxyHosts' you need to use pipes instead
+			// see https://github.com/aws/aws-sdk-java-v2/issues/5573
+			// and https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/net/doc-files/net-properties.html
+			noProxy = noProxy.replace(',', '|')
+		}
         proxyWorkstation = options.proxyWorkstation ?: proxyWorkstation
         chunkSize = options.chunkSize ?: chunkSize
 		tempDir = options.tempDir ?: tempDir

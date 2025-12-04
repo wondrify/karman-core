@@ -24,7 +24,7 @@ ext {
     isReleaseVersion = !isBuildSnapshot
 }
 
-group = 'cloud.wondrify.plugins'
+group = 'cloud.wondrify'
 
 
 if (isReleaseVersion) {
