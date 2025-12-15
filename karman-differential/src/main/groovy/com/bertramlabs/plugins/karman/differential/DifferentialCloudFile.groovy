@@ -13,7 +13,7 @@ import java.util.concurrent.Callable
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPOutputStream
-
+import com.bertramlabs.plugins.karman.util.BoundedExecutor
 
 @Commons
 public class DifferentialCloudFile extends CloudFile {
@@ -23,8 +23,8 @@ public class DifferentialCloudFile extends CloudFile {
 	private Long internalContentLength;
 	private boolean internalContentLengthSet = false;
 	private DifferentialCloudFile linkedFile = null
-	private ExecutorService blockWriteExecutor = java.util.concurrent.Executors.newFixedThreadPool(4)
-
+	private BoundedExecutor blockWriteExecutor = new BoundedExecutor(java.util.concurrent.Executors.newFixedThreadPool(4),4)
+	private Long onDeviceContentLength = null
 	DifferentialCloudFile(String name, DifferentialDirectory parent, CloudFileInterface sourceFile) {
 		this.name = name
 		this.provider = parent.provider
@@ -131,22 +131,26 @@ public class DifferentialCloudFile extends CloudFile {
 
 	Long getOnDeviceContentLength() {
 		CloudFile manifestFile = parent.sourceDirectory[sourceFile.name + "/karman.diff"]
-
 		if(manifestFile.exists()) {
 			DifferentialInputStream is = null
 			try {
 				long contentLength = manifestFile.contentLength
-				is = new DifferentialInputStream(sourceFile, manifestFile.getInputStream())
-				ManifestData.BlockData currentBlock = is.getNextBlockData()
-				while(currentBlock != null) {
+				if(onDeviceContentLength) {
+					contentLength += onDeviceContentLength
+				} else {
+					is = new DifferentialInputStream(sourceFile, manifestFile.getInputStream())
+					ManifestData.BlockData currentBlock = is.getNextBlockData()
+					while(currentBlock != null) {
 //					contentLength += currentBlock.blockSize //this is the uncompressed size and is not accurate
-					if(currentBlock.fileIndex == 0 && !currentBlock.zeroFilled) {
-						String blockFilePath = ManifestData.BlockData.getBlockPath(sourceFile, currentBlock.block, 0, is.manifestData);
-						CloudFile blockFile = parent.sourceDirectory[blockFilePath]
-						contentLength += blockFile.contentLength
+						if(currentBlock.fileIndex == 0 && !currentBlock.zeroFilled) {
+							String blockFilePath = ManifestData.BlockData.getBlockPath(sourceFile, currentBlock.block, 0, is.manifestData);
+							CloudFile blockFile = parent.sourceDirectory[blockFilePath]
+							contentLength += blockFile.contentLength
+						}
+						currentBlock = is.getNextBlockData()
 					}
-					currentBlock = is.getNextBlockData()
 				}
+
 				return contentLength
 			} finally {
 				try {
@@ -227,7 +231,7 @@ public class DifferentialCloudFile extends CloudFile {
 				Path localManifestCache = Files.createTempFile("karman",".diff")
 				manifestLocalFile = localManifestCache.toFile()
 				//todo: cleanup all sub files since we are overwriting the file
-
+				onDeviceContentLength = 0l
 				ManifestData manifestData = new ManifestData()
 				manifestData.fileSize = internalContentLength
 				manifestData.fileName = sourceFile.name
@@ -289,7 +293,9 @@ public class DifferentialCloudFile extends CloudFile {
 						xz.write(buffer, 0, bytesRead)
 						xz.finish()
 						String blockFilePath = ManifestData.BlockData.getBlockPath(sourceFile, blockNumber, 0, manifestData);
-						asyncWriteBlock(blockFilePath,compressedBuffer.toByteArray())
+						byte[] data = compressedBuffer.toByteArray()
+						asyncWriteBlock(blockFilePath,data)
+						onDeviceContentLength += data.size()
 					}
 					blockNumber++
 				}
@@ -318,8 +324,16 @@ public class DifferentialCloudFile extends CloudFile {
 		}
 	}
 
+	private Date saturactionNotify = null
+
 	@CompileStatic
 	protected asyncWriteBlock(String blockFilePath, byte[] data) {
+		if(blockWriteExecutor.availablePermits() == 0) {
+			if(saturactionNotify == null || (new Date().time - saturactionNotify.time) > 60000) {
+				saturactionNotify = new Date()
+				log.info("Block write executor is saturated, max throughput is being achieved...")
+			}
+		}
 		blockWriteExecutor.submit(new AsyncBlockWriter(blockFilePath, data))
 	}
 
@@ -342,28 +356,35 @@ public class DifferentialCloudFile extends CloudFile {
 		Boolean call() throws Exception {
 			int attempts=0
 			Boolean success = false
-			while(attempts < 5) {
-				try {
-					CloudFileInterface blockFile = parent.sourceDirectory[blockFilePath]
+			try {
+				while(attempts < 5) {
+					try {
 
-					blockFile.setContentLength(data.size())
-					blockFile.setInputStream(new ByteArrayInputStream(data));
-					blockFile.save()
-					success = true
-					break
-				} catch(Exception e) {
-					attempts++
-					sleep(5000l*attempts + 5000l)
+						CloudFileInterface blockFile = parent.sourceDirectory[blockFilePath]
 
-					if(attempts == 5) {
-						log.error("Error saving block file...Max Attempts Reached...",e)
-						throw new Exception("Error saving block file...Max Attempts Reached...",e)
-					} else {
-						log.error("Error saving block file...sleeping and trying again shortly...",e)
+						blockFile.setContentLength(data.size())
+						blockFile.setInputStream(new ByteArrayInputStream(data));
+						blockFile.save()
+						success = true
+						break
+					} catch(Exception e) {
+						attempts++
+						sleep(5000l*attempts + 5000l)
+
+						if(attempts == 5) {
+							log.error("Error saving block file...Max Attempts Reached...",e)
+							throw new Exception("Error saving block file...Max Attempts Reached...",e)
+						} else {
+							log.error("Error saving block file...sleeping and trying again shortly...",e)
+						}
 					}
-				}
 
+				}
+			} catch(Exception ie) {
+				log.error("Error Saving Data to " + blockFilePath,ie);
 			}
+
+
 			return success
 		}
 	}
@@ -437,6 +458,7 @@ public class DifferentialCloudFile extends CloudFile {
 		this.linkedFile = linkedFile
 	}
 
+	@CompileStatic
 	void flatten(List<DifferentialCloudFile> children = null) {
 		CloudFile manifestFile = parent.sourceDirectory[sourceFile.name + "/karman.diff"]
 		List<String> sourceFilesToUnlink = []
@@ -444,7 +466,6 @@ public class DifferentialCloudFile extends CloudFile {
 		if(manifestFile.exists()) {
 			DifferentialInputStream unflattenedStream = null
 			OutputStream pos
-//			PipedInputStream pis
 			File manifestLocalFile=null
 			try {
 					Path localManifestCache = Files.createTempFile("karman",".diff")
@@ -491,8 +512,9 @@ public class DifferentialCloudFile extends CloudFile {
 										if(destBlockFile.exists()) {
 											destBlockFile.delete()
 										}
-										destBlockFile.setInputStream(blockFile.getInputStream())
-										destBlockFile.save()
+										asyncWriteBlock(newBlockFilePath,blockFile.getBytes())
+//										destBlockFile.setInputStream(blockFile.getInputStream())
+//										destBlockFile.save()
 										break
 									} catch(Exception e) {
 										attempts++
@@ -515,7 +537,7 @@ public class DifferentialCloudFile extends CloudFile {
 						currentBlock = unflattenedStream.getNextBlockData()
 					}
 					//lets make sure executor is done
-				  blockWriteExecutor.awaitTermination(60, TimeUnit.SECONDS)
+
 					pos.flush()
 					pos.close()
 					pos = null //clear it for finally block unless exception occurs

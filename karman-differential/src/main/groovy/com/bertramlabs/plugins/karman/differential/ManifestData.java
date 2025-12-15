@@ -9,10 +9,10 @@ public class ManifestData {
     public Long fileSize; //could be unspecified
     public int blockSize; //could be unspecified
     public List<String> sourceFiles;
-    public int version = 1;
+    public int version = 2;
 
     public static class BlockData {
-        public static final int SIZE = 44;
+        public static final int SIZE = 48;
         long block;
         int fileIndex = 0;
         int blockSize;
@@ -24,7 +24,7 @@ public class ManifestData {
             byte[] blockBytes = new byte[8];
             byte[] blockSizeBytes = new byte[4];
             byte[] fileIndexBytes = new byte[4];
-            System.arraycopy(hash, 0, bytes, 16, 28);
+            System.arraycopy(hash, 0, bytes, 16, 32);
             blockBytes[0] = (byte) (block >> 56);
             blockBytes[1] = (byte) (block >> 48);
             blockBytes[2] = (byte) (block >> 40);

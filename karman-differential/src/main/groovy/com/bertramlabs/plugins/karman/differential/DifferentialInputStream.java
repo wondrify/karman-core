@@ -2,8 +2,6 @@ package com.bertramlabs.plugins.karman.differential;
 
 import com.bertramlabs.plugins.karman.CloudFile;
 import com.bertramlabs.plugins.karman.CloudFileInterface;
-import org.tukaani.xz.XZInputStream;
-
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -185,21 +183,40 @@ public class DifferentialInputStream extends InputStream {
         ManifestData.BlockData blockData = new ManifestData.BlockData();
         byte[] blockDataBytes = new byte[ManifestData.BlockData.SIZE];
         int bytesRead = sourceManifest.read(blockDataBytes);
-        if(bytesRead == -1) {
-            return null;
-        } else if(bytesRead < 44) {
-            //we have a problem and need to hold until the data is available
-            log.warn("Block Data Incomplete: " + bytesRead);
-            while(bytesRead < 44) {
-                int newBytesRead = sourceManifest.read(blockDataBytes, bytesRead, 44-bytesRead);
-                if(newBytesRead == -1) {
-                    throw new IOException("Unexpected EOF");
-                } else {
-                    bytesRead += newBytesRead;
+
+        if(manifestData.version == 1) {
+            if(bytesRead == -1) {
+                return null;
+            } else if(bytesRead < 44) {
+                //we have a problem and need to hold until the data is available
+                log.warn("Block Data Incomplete: " + bytesRead);
+                while(bytesRead < 44) {
+                    int newBytesRead = sourceManifest.read(blockDataBytes, bytesRead, 44-bytesRead);
+                    if(newBytesRead == -1) {
+                        throw new IOException("Unexpected EOF");
+                    } else {
+                        bytesRead += newBytesRead;
+                    }
+                }
+
+            }
+        } else if(manifestData.version == 2) {
+            if(bytesRead == -1) {
+                return null;
+            } else if(bytesRead < 48) {
+                //we have a problem and need to hold until the data is available
+                log.warn("Block Data Incomplete: " + bytesRead);
+                while(bytesRead < 48) {
+                    int newBytesRead = sourceManifest.read(blockDataBytes, bytesRead, 48-bytesRead);
+                    if(newBytesRead == -1) {
+                        throw new IOException("Unexpected EOF");
+                    } else {
+                        bytesRead += newBytesRead;
+                    }
                 }
             }
-
         }
+
         long value = 0;
         for (int i = 0; i < 8; i++) {
             value = (value << 8) + (blockDataBytes[i] & 0xff);
@@ -216,6 +233,7 @@ public class DifferentialInputStream extends InputStream {
             fileIndex = (fileIndex << 8) + (blockDataBytes[i] & 0xff);
         }
         blockData.fileIndex= fileIndex;
+
         blockData.hash = Arrays.copyOfRange(blockDataBytes, 16, blockDataBytes.length);
         //check if blockData.hash is an empty byte array
         blockData.zeroFilled = true;

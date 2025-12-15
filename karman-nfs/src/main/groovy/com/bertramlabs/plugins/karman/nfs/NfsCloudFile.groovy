@@ -40,9 +40,10 @@ class NfsCloudFile extends CloudFile{
 
 	@Override
 	OutputStream getOutputStream() {
-		if(!baseFile.exists()) {
-			baseFile.createNewFile()
-		}
+//		if(!baseFile.exists()) {
+//
+//		}
+		baseFile.createNewFile()
 		return new NfsFileOutputStream(baseFile)
 	}
 

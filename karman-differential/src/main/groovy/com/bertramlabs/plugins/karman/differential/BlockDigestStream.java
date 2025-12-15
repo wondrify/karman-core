@@ -32,7 +32,7 @@ public class BlockDigestStream extends InputStream {
         blockData = new ManifestData.BlockData();
         blockData.block = currentBlock;
         blockData.fileIndex = 0;
-        shaDigest = MessageDigest.getInstance("SHA3-224");
+        shaDigest = MessageDigest.getInstance("SHA-256");
         if(linkedFileStream != null) {
             try {
                 linkedBlockData = linkedFileStream.getNextBlockData();
@@ -71,7 +71,7 @@ public class BlockDigestStream extends InputStream {
             if(bytesRead % blockSize == 0) {
                 if(zeroFilled) {
                     blockData.zeroFilled = true;
-                    blockData.hash = new byte[28];
+                    blockData.hash = new byte[32];
                 } else {
                     blockData.hash = shaDigest.digest();
                 }
@@ -167,7 +167,7 @@ public class BlockDigestStream extends InputStream {
 
                 if(zeroFilled) {
                     blockData.zeroFilled = true;
-                    blockData.hash = new byte[28];
+                    blockData.hash = new byte[32];
                 } else {
                     blockData.hash = shaDigest.digest();
                 }
@@ -217,7 +217,7 @@ public class BlockDigestStream extends InputStream {
         } else if( bytesRead > 0) {
             if(zeroFilled) {
                 blockData.zeroFilled = true;
-                blockData.hash = new byte[28];
+                blockData.hash = new byte[32];
             } else {
                 blockData.hash = shaDigest.digest();
             }
