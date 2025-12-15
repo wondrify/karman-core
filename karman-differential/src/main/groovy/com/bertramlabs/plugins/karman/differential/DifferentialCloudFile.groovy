@@ -7,12 +7,11 @@ import com.bertramlabs.plugins.karman.StorageProvider
 import com.bertramlabs.plugins.karman.util.Mimetypes
 import groovy.transform.CompileStatic
 import groovy.util.logging.Commons
-import org.tukaani.xz.LZMA2Options
-import org.tukaani.xz.XZ
-import org.tukaani.xz.XZOutputStream
-
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPOutputStream
 
 
@@ -24,6 +23,7 @@ public class DifferentialCloudFile extends CloudFile {
 	private Long internalContentLength;
 	private boolean internalContentLengthSet = false;
 	private DifferentialCloudFile linkedFile = null
+	private ExecutorService blockWriteExecutor = java.util.concurrent.Executors.newFixedThreadPool(4)
 
 	DifferentialCloudFile(String name, DifferentialDirectory parent, CloudFileInterface sourceFile) {
 		this.name = name
@@ -288,32 +288,8 @@ public class DifferentialCloudFile extends CloudFile {
 						//XZOutputStream xz = new XZOutputStream(compressedBuffer, new LZMA2Options(0), XZ.CHECK_NONE)
 						xz.write(buffer, 0, bytesRead)
 						xz.finish()
-
-
 						String blockFilePath = ManifestData.BlockData.getBlockPath(sourceFile, blockNumber, 0, manifestData);
-						int attempts=0
-						while(attempts < 5) {
-							try {
-								CloudFileInterface blockFile = parent.sourceDirectory[blockFilePath]
-								byte[] compressedBufferArray = compressedBuffer.toByteArray()
-								blockFile.setContentLength(compressedBufferArray.size())
-								blockFile.setInputStream(new ByteArrayInputStream(compressedBufferArray));
-								blockFile.save()
-								break
-							} catch(Exception e) {
-								attempts++
-								sleep(5000l*attempts + 5000l)
-
-								if(attempts == 5) {
-									log.error("Error saving block file...Max Attempts Reached...",e)
-									throw new Exception("Error saving block file...Max Attempts Reached...",e)
-								} else {
-									log.error("Error saving block file...sleeping and trying again shortly...",e)
-								}
-							}
-						}
-
-
+						asyncWriteBlock(blockFilePath,compressedBuffer.toByteArray())
 					}
 					blockNumber++
 				}
@@ -339,6 +315,56 @@ public class DifferentialCloudFile extends CloudFile {
 
 		} else {
 			sourceFile.save(acl)
+		}
+	}
+
+	@CompileStatic
+	protected asyncWriteBlock(String blockFilePath, byte[] data) {
+		blockWriteExecutor.submit(new AsyncBlockWriter(blockFilePath, data))
+	}
+
+	@CompileStatic
+	private class AsyncBlockWriter implements Callable<Boolean> {
+		String blockFilePath
+		byte[] data
+		AsyncBlockWriter(String blockFilePath, byte[] data) {
+			this.blockFilePath = blockFilePath
+			this.data = data
+		}
+/**
+ * Computes a result, or throws an exception if unable to do so.
+ *
+ * @return computed result
+ * @throws Exception if unable to compute a result
+ */
+
+		@Override
+		Boolean call() throws Exception {
+			int attempts=0
+			Boolean success = false
+			while(attempts < 5) {
+				try {
+					CloudFileInterface blockFile = parent.sourceDirectory[blockFilePath]
+
+					blockFile.setContentLength(data.size())
+					blockFile.setInputStream(new ByteArrayInputStream(data));
+					blockFile.save()
+					success = true
+					break
+				} catch(Exception e) {
+					attempts++
+					sleep(5000l*attempts + 5000l)
+
+					if(attempts == 5) {
+						log.error("Error saving block file...Max Attempts Reached...",e)
+						throw new Exception("Error saving block file...Max Attempts Reached...",e)
+					} else {
+						log.error("Error saving block file...sleeping and trying again shortly...",e)
+					}
+				}
+
+			}
+			return success
 		}
 	}
 
@@ -488,6 +514,8 @@ public class DifferentialCloudFile extends CloudFile {
 						pos.write(currentBlock.generateBytes())
 						currentBlock = unflattenedStream.getNextBlockData()
 					}
+					//lets make sure executor is done
+				  blockWriteExecutor.awaitTermination(60, TimeUnit.SECONDS)
 					pos.flush()
 					pos.close()
 					pos = null //clear it for finally block unless exception occurs
