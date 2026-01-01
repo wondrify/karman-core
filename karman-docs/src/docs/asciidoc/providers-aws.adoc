@@ -1,0 +1,355 @@
+= AWS S3 Provider
+:toc: left
+
+== Overview
+
+The AWS S3 provider enables seamless integration with Amazon Simple Storage Service (S3). It supports all standard Karman operations including file upload, download, streaming, and metadata management.
+
+== Dependencies
+
+Add the AWS provider to your project:
+
+[source,groovy]
+----
+dependencies {
+    implementation 'cloud.wondrify:karman-core:{project-version}'
+    implementation 'cloud.wondrify:karman-aws:{project-version}'
+}
+----
+
+== Configuration
+
+=== Basic Configuration
+
+[source,groovy]
+----
+import com.bertramlabs.plugins.karman.StorageProvider
+
+def provider = StorageProvider.create(
+    provider: 's3',
+    accessKey: 'YOUR_ACCESS_KEY',
+    secretKey: 'YOUR_SECRET_KEY'
+)
+----
+
+=== Advanced Configuration
+
+[source,groovy]
+----
+def provider = StorageProvider.create(
+    provider: 's3',
+    accessKey: 'YOUR_ACCESS_KEY',
+    secretKey: 'YOUR_SECRET_KEY',
+    region: 'us-west-2',           // AWS region (default: us-east-1)
+    protocol: 'https',              // Protocol to use (default: https)
+    useGzip: false,                 // Enable gzip compression (default: false)
+    keepAlive: false,               // HTTP keep-alive (default: false)
+    maxConnections: 50,             // Max HTTP connections (default: 50)
+    baseUrl: 'custom-domain.com',   // Custom domain for S3 URLs
+    forceMultipart: false,          // Force multipart uploads (default: false)
+    chunkSize: 5242880              // Multipart chunk size in bytes (default: 5MB)
+)
+----
+
+=== Using IAM Roles
+
+When running on EC2 instances with IAM roles, you can omit credentials:
+
+[source,groovy]
+----
+def provider = StorageProvider.create(
+    provider: 's3',
+    region: 'us-west-2'
+)
+----
+
+== Configuration Options
+
+[cols="1,1,3"]
+|===
+|Option |Type |Description
+
+|accessKey
+|String
+|AWS access key ID
+
+|secretKey
+|String
+|AWS secret access key
+
+|region
+|String
+|AWS region (e.g., us-east-1, eu-west-1)
+
+|protocol
+|String
+|Protocol for requests (http or https)
+
+|useGzip
+|Boolean
+|Enable gzip compression for uploads
+
+|keepAlive
+|Boolean
+|Enable HTTP keep-alive connections
+
+|maxConnections
+|Integer
+|Maximum number of HTTP connections
+
+|baseUrl
+|String
+|Custom domain for generating file URLs
+
+|forceMultipart
+|Boolean
+|Force multipart uploads for all files
+
+|chunkSize
+|Long
+|Size of each chunk for multipart uploads (bytes)
+
+|defaultFileACL
+|CloudFileACL
+|Default access control for uploaded files
+|===
+
+== Usage Examples
+
+=== Working with Buckets
+
+[source,groovy]
+----
+// Get a bucket reference
+def bucket = provider['my-bucket']
+
+// Check if bucket exists
+if (!bucket.exists()) {
+    bucket.save() // Create the bucket
+}
+
+// List all buckets
+provider.getDirectories().each { bucket ->
+    println bucket.name
+}
+----
+
+=== Uploading Files
+
+[source,groovy]
+----
+// Upload from string
+bucket['example.txt'].text = 'Hello, S3!'
+bucket['example.txt'].save()
+
+// Upload from bytes
+bucket['image.png'].bytes = imageByteArray
+bucket['image.png'].save()
+
+// Upload from InputStream
+bucket['data.csv'].inputStream = new FileInputStream('local-file.csv')
+bucket['data.csv'].save()
+
+// Upload with metadata
+def file = bucket['document.pdf']
+file.contentType = 'application/pdf'
+file.setMetadata([
+    'author': 'John Doe',
+    'version': '1.0'
+])
+file.bytes = pdfBytes
+file.save()
+----
+
+=== Downloading Files
+
+[source,groovy]
+----
+// Get file as text
+def content = bucket['example.txt'].text
+
+// Get file as bytes
+def bytes = bucket['image.png'].bytes
+
+// Get file as InputStream
+def inputStream = bucket['data.csv'].inputStream
+
+// Save to local file
+bucket['document.pdf'].inputStream.withStream { input ->
+    new File('local-document.pdf').withOutputStream { output ->
+        output << input
+    }
+}
+----
+
+=== File Metadata
+
+[source,groovy]
+----
+def file = bucket['example.txt']
+
+// Get file size
+println "Size: ${file.contentLength} bytes"
+
+// Get content type
+println "Type: ${file.contentType}"
+
+// Get last modified date
+println "Modified: ${file.lastModified}"
+
+// Check if file exists
+if (file.exists()) {
+    println "File exists"
+}
+
+// Get custom metadata
+def metadata = file.getMetadata()
+metadata.each { key, value ->
+    println "${key}: ${value}"
+}
+----
+
+=== Listing Files
+
+[source,groovy]
+----
+// List all files in bucket
+bucket.listFiles().each { file ->
+    println "${file.name} - ${file.contentLength} bytes"
+}
+
+// List files with prefix
+bucket.listFiles(prefix: 'uploads/').each { file ->
+    println file.name
+}
+
+// List files with delimiter (folder-like structure)
+bucket.listFiles(prefix: 'images/', delimiter: '/').each { file ->
+    println file.name
+}
+
+// Paginated listing
+def options = [
+    marker: 'last-key',  // Start after this key
+    maxKeys: 100         // Max files to return
+]
+bucket.listFiles(options).each { file ->
+    println file.name
+}
+----
+
+=== Deleting Files
+
+[source,groovy]
+----
+// Delete a single file
+bucket['example.txt'].delete()
+
+// Delete multiple files
+def filesToDelete = ['file1.txt', 'file2.txt', 'file3.txt']
+filesToDelete.each { filename ->
+    bucket[filename].delete()
+}
+----
+
+=== Generating Presigned URLs
+
+[source,groovy]
+----
+def file = bucket['private-document.pdf']
+
+// Generate URL valid for 1 hour
+def url = file.getURL(3600)
+println "Download URL: ${url}"
+
+// Generate URL with custom expiration (in seconds)
+def longTermUrl = file.getURL(86400 * 7) // Valid for 7 days
+----
+
+=== Access Control (ACL)
+
+[source,groovy]
+----
+import com.bertramlabs.plugins.karman.CloudFileACL
+
+// Set ACL on upload
+def file = bucket['public-image.png']
+file.setACL(CloudFileACL.PublicRead)
+file.bytes = imageBytes
+file.save()
+
+// Available ACL options:
+// - CloudFileACL.Private
+// - CloudFileACL.PublicRead
+// - CloudFileACL.PublicReadWrite
+// - CloudFileACL.AuthenticatedRead
+----
+
+== Best Practices
+
+=== Performance
+
+* Use multipart uploads for files larger than 5MB
+* Enable `keepAlive` for high-volume operations
+* Adjust `maxConnections` based on your workload
+* Use streaming for large files to minimize memory usage
+
+=== Security
+
+* Never hardcode credentials - use environment variables or IAM roles
+* Use presigned URLs for temporary access to private files
+* Set appropriate ACLs based on your security requirements
+* Enable S3 bucket encryption
+
+=== Cost Optimization
+
+* Use lifecycle policies to transition old files to cheaper storage classes
+* Enable intelligent tiering for unpredictable access patterns
+* Clean up multipart uploads that didn't complete
+* Use CloudFront for frequently accessed files
+
+== Troubleshooting
+
+=== Connection Issues
+
+If you experience connection timeouts, try:
+
+[source,groovy]
+----
+def provider = StorageProvider.create(
+    provider: 's3',
+    accessKey: accessKey,
+    secretKey: secretKey,
+    maxConnections: 100,
+    keepAlive: true
+)
+----
+
+=== Region-Specific Errors
+
+Ensure you specify the correct region for your bucket:
+
+[source,groovy]
+----
+def provider = StorageProvider.create(
+    provider: 's3',
+    accessKey: accessKey,
+    secretKey: secretKey,
+    region: 'eu-central-1'  // Must match bucket region
+)
+----
+
+=== Large File Uploads
+
+For files larger than 5MB, enable multipart uploads:
+
+[source,groovy]
+----
+def provider = StorageProvider.create(
+    provider: 's3',
+    accessKey: accessKey,
+    secretKey: secretKey,
+    forceMultipart: true,
+    chunkSize: 10485760  // 10MB chunks
+)
+----

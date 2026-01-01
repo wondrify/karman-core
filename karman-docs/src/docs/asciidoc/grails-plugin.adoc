@@ -1,0 +1,550 @@
+= Grails Plugin Integration
+:toc: left
+
+== Overview
+
+The Karman Grails plugin provides seamless integration with Grails applications, including configuration management, dependency injection, and a controller for serving local files.
+
+== Installation
+
+Add the plugin to your `build.gradle`:
+
+[source,groovy]
+----
+dependencies {
+    implementation 'cloud.wondrify:karman-grails:{project-version}'
+    implementation 'cloud.wondrify:karman-aws:{project-version}' // Add providers as needed
+}
+----
+
+== Configuration
+
+=== Basic Configuration
+
+Configure Karman in `application.yml` or `application.groovy`:
+
+[source,yaml]
+----
+grails:
+    plugin:
+        karman:
+            serveLocalStorage: true
+            serveLocalMapping: 'storage'  # Maps to /storage URL
+            storagePath: '/var/app/storage'
+            defaultFileACL: 'Private'
+----
+
+Or in `application.groovy`:
+
+[source,groovy]
+----
+grails.plugin.karman.serveLocalStorage = true
+grails.plugin.karman.serveLocalMapping = 'storage'
+grails.plugin.karman.storagePath = '/var/app/storage'
+grails.plugin.karman.defaultFileACL = com.bertramlabs.plugins.karman.CloudFileACL.Private
+----
+
+=== Configuration Options
+
+[cols="1,1,3"]
+|===
+|Option |Type |Description
+
+|serveLocalStorage
+|Boolean
+|Enable HTTP endpoint for local storage (default: false)
+
+|serveLocalMapping
+|String
+|URL path for serving local files (default: 'storage')
+
+|storagePath
+|String
+|Base path for local file storage
+
+|defaultFileACL
+|CloudFileACL
+|Default access control for new files
+|===
+
+== Using KarmanConfigHolder
+
+The `KarmanConfigHolder` provides static access to Karman configuration:
+
+[source,groovy]
+----
+import com.bertramlabs.plugins.karman.KarmanConfigHolder
+
+// Access configuration
+def config = KarmanConfigHolder.config
+def storagePath = config.storagePath
+
+// Access grailsApplication
+def grailsApp = KarmanConfigHolder.grailsApplication
+----
+
+== Provider Configuration
+
+=== Declarative Provider Configuration
+
+Define providers in your configuration file:
+
+[source,yaml]
+----
+karman:
+    providers:
+        s3Storage:
+            provider: 's3'
+            accessKey: '${S3_ACCESS_KEY}'
+            secretKey: '${S3_SECRET_KEY}'
+            region: 'us-east-1'
+            defaultFileACL: 'PublicRead'
+        
+        localBackup:
+            provider: 'local'
+            basePath: '/var/backups'
+        
+        azureStorage:
+            provider: 'azure-pageblob'
+            storageAccount: '${AZURE_ACCOUNT}'
+            storageKey: '${AZURE_KEY}'
+----
+
+=== Accessing Configured Providers
+
+[source,groovy]
+----
+import com.bertramlabs.plugins.karman.KarmanProviders
+
+class FileService {
+    
+    def uploadToS3(file) {
+        def provider = KarmanProviders.s3Storage
+        def bucket = provider['my-bucket']
+        
+        bucket[file.originalFilename].bytes = file.bytes
+        bucket[file.originalFilename].save()
+    }
+    
+    def backupLocally(filename, data) {
+        def provider = KarmanProviders.localBackup
+        def dir = provider['archives']
+        
+        dir[filename].text = data
+        dir[filename].save()
+    }
+}
+----
+
+== Dependency Injection
+
+=== Injecting Providers
+
+Define providers as Spring beans:
+
+[source,groovy]
+----
+// grails-app/conf/spring/resources.groovy
+import com.bertramlabs.plugins.karman.StorageProvider
+
+beans = {
+    s3Provider(StorageProvider) { bean ->
+        bean.factoryMethod = 'create'
+        provider = 's3'
+        accessKey = application.config.aws.accessKey
+        secretKey = application.config.aws.secretKey
+        region = 'us-east-1'
+    }
+    
+    localProvider(StorageProvider) { bean ->
+        bean.factoryMethod = 'create'
+        provider = 'local'
+        basePath = '/var/app/storage'
+    }
+}
+----
+
+=== Using Injected Providers
+
+[source,groovy]
+----
+class DocumentService {
+    
+    def s3Provider
+    def localProvider
+    
+    def uploadDocument(file, metadata) {
+        def bucket = s3Provider['documents']
+        def cloudFile = bucket["${metadata.id}/${file.originalFilename}"]
+        
+        cloudFile.contentType = file.contentType
+        cloudFile.setMetadata(metadata)
+        cloudFile.bytes = file.bytes
+        cloudFile.save()
+        
+        return cloudFile.getURL()
+    }
+}
+----
+
+== Controllers
+
+=== Local Storage Controller
+
+The Karman plugin provides a built-in controller for serving locally stored files:
+
+[source,groovy]
+----
+// Automatically maps to /storage/** when serveLocalStorage = true
+// Files in /var/app/storage/images/photo.jpg accessible at:
+// http://localhost:8080/storage/images/photo.jpg
+----
+
+=== Custom File Upload Controller
+
+[source,groovy]
+----
+import com.bertramlabs.plugins.karman.StorageProvider
+
+class FileUploadController {
+    
+    def s3Provider
+    
+    def upload() {
+        def file = request.getFile('file')
+        if (file.empty) {
+            render status: 400, text: 'File is required'
+            return
+        }
+        
+        try {
+            def bucket = s3Provider['uploads']
+            def cloudFile = bucket["${new Date().time}-${file.originalFilename}"]
+            
+            cloudFile.contentType = file.contentType
+            cloudFile.bytes = file.bytes
+            cloudFile.save()
+            
+            render(contentType: 'application/json') {
+                success = true
+                url = cloudFile.getURL()
+                filename = cloudFile.name
+            }
+        } catch (Exception e) {
+            log.error("Upload failed", e)
+            render status: 500, text: "Upload failed: ${e.message}"
+        }
+    }
+    
+    def download(String bucket, String filename) {
+        try {
+            def cloudFile = s3Provider[bucket][filename]
+            
+            if (!cloudFile.exists()) {
+                render status: 404, text: 'File not found'
+                return
+            }
+            
+            response.contentType = cloudFile.contentType
+            response.setHeader('Content-Disposition', "attachment; filename=\"${filename}\"")
+            response.outputStream << cloudFile.inputStream
+            response.outputStream.flush()
+        } catch (Exception e) {
+            log.error("Download failed", e)
+            render status: 500, text: "Download failed"
+        }
+    }
+}
+----
+
+## Services
+
+=== File Management Service
+
+[source,groovy]
+----
+import grails.gorm.transactions.Transactional
+import com.bertramlabs.plugins.karman.CloudFileACL
+
+@Transactional
+class StorageService {
+    
+    def s3Provider
+    
+    def saveFile(String bucketName, String path, InputStream inputStream, String contentType) {
+        def bucket = s3Provider[bucketName]
+        def file = bucket[path]
+        
+        file.contentType = contentType
+        file.inputStream = inputStream
+        file.save(CloudFileACL.Private)
+        
+        return file.getURL(3600) // 1 hour expiry
+    }
+    
+    def listFiles(String bucketName, String prefix = null) {
+        def bucket = s3Provider[bucketName]
+        def options = prefix ? [prefix: prefix] : [:]
+        
+        return bucket.listFiles(options).collect { file ->
+            [
+                name: file.name,
+                size: file.contentLength,
+                contentType: file.contentType,
+                lastModified: file.lastModified
+            ]
+        }
+    }
+    
+    def deleteFile(String bucketName, String path) {
+        def file = s3Provider[bucketName][path]
+        if (file.exists()) {
+            file.delete()
+            return true
+        }
+        return false
+    }
+    
+    def copyFile(String sourceBucket, String sourcePath, 
+                 String destBucket, String destPath) {
+        def sourceFile = s3Provider[sourceBucket][sourcePath]
+        def destFile = s3Provider[destBucket][destPath]
+        
+        destFile.inputStream = sourceFile.inputStream
+        destFile.contentType = sourceFile.contentType
+        destFile.contentLength = sourceFile.contentLength
+        destFile.save()
+    }
+}
+----
+
+=== Image Processing Service
+
+[source,groovy]
+----
+import javax.imageio.ImageIO
+import java.awt.image.BufferedImage
+
+class ImageService {
+    
+    def s3Provider
+    
+    def uploadWithThumbnail(file, String bucket) {
+        // Upload original
+        def original = s3Provider[bucket]["originals/${file.originalFilename}"]
+        original.contentType = 'image/jpeg'
+        original.bytes = file.bytes
+        original.save(CloudFileACL.PublicRead)
+        
+        // Create and upload thumbnail
+        def thumbnail = createThumbnail(file.inputStream, 200, 200)
+        def thumbFile = s3Provider[bucket]["thumbnails/${file.originalFilename}"]
+        thumbFile.contentType = 'image/jpeg'
+        thumbFile.bytes = thumbnail
+        thumbFile.save(CloudFileACL.PublicRead)
+        
+        return [
+            original: original.getURL(),
+            thumbnail: thumbFile.getURL()
+        ]
+    }
+    
+    private byte[] createThumbnail(InputStream input, int width, int height) {
+        def image = ImageIO.read(input)
+        def thumbnail = image.getScaledInstance(width, height, BufferedImage.SCALE_SMOOTH)
+        
+        def bufferedThumbnail = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
+        bufferedThumbnail.graphics.drawImage(thumbnail, 0, 0, null)
+        
+        def outputStream = new ByteArrayOutputStream()
+        ImageIO.write(bufferedThumbnail, 'jpg', outputStream)
+        
+        return outputStream.toByteArray()
+    }
+}
+----
+
+== Domain Integration
+
+=== Storing File References
+
+[source,groovy]
+----
+class Document {
+    String filename
+    String bucketName
+    String path
+    String contentType
+    Long fileSize
+    Date uploadDate
+    
+    static constraints = {
+        filename blank: false
+        path blank: false
+        contentType nullable: true
+        fileSize nullable: true
+    }
+    
+    // Transient property for accessing actual file
+    def getCloudFile(storageService) {
+        storageService.s3Provider[bucketName][path]
+    }
+    
+    String getDownloadUrl(storageService, Integer expirySeconds = 3600) {
+        getCloudFile(storageService).getURL(expirySeconds)
+    }
+}
+----
+
+=== Document Service
+
+[source,groovy]
+----
+@Transactional
+class DocumentService {
+    
+    def s3Provider
+    
+    Document createDocument(file, String bucketName, Map metadata = [:]) {
+        def path = "${UUID.randomUUID()}/${file.originalFilename}"
+        def cloudFile = s3Provider[bucketName][path]
+        
+        cloudFile.contentType = file.contentType
+        cloudFile.setMetadata(metadata)
+        cloudFile.bytes = file.bytes
+        cloudFile.save()
+        
+        def document = new Document(
+            filename: file.originalFilename,
+            bucketName: bucketName,
+            path: path,
+            contentType: file.contentType,
+            fileSize: file.size,
+            uploadDate: new Date()
+        )
+        
+        document.save(flush: true)
+        return document
+    }
+    
+    def deleteDocument(Document document) {
+        def cloudFile = document.getCloudFile(this)
+        cloudFile.delete()
+        document.delete(flush: true)
+    }
+}
+----
+
+== Testing
+
+=== Unit Tests
+
+[source,groovy]
+----
+import grails.testing.services.ServiceUnitTest
+import com.bertramlabs.plugins.karman.local.LocalStorageProvider
+import spock.lang.Specification
+
+class StorageServiceSpec extends Specification implements ServiceUnitTest<StorageService> {
+    
+    def setup() {
+        // Use local provider for testing
+        service.s3Provider = new LocalStorageProvider(
+            basePath: '/tmp/test-storage'
+        )
+    }
+    
+    def cleanup() {
+        new File('/tmp/test-storage').deleteDir()
+    }
+    
+    void "test file upload"() {
+        given:
+        def content = "test content"
+        def inputStream = new ByteArrayInputStream(content.bytes)
+        
+        when:
+        def url = service.saveFile('test-bucket', 'test.txt', inputStream, 'text/plain')
+        
+        then:
+        url != null
+        service.s3Provider['test-bucket']['test.txt'].exists()
+        service.s3Provider['test-bucket']['test.txt'].text == content
+    }
+}
+----
+
+=== Integration Tests
+
+[source,groovy]
+----
+import grails.testing.mixin.integration.Integration
+import grails.gorm.transactions.Rollback
+import spock.lang.Specification
+
+@Integration
+@Rollback
+class FileUploadIntegrationSpec extends Specification {
+    
+    def storageService
+    
+    void "test end-to-end file upload and download"() {
+        given:
+        def testContent = "Integration test content"
+        def inputStream = new ByteArrayInputStream(testContent.bytes)
+        
+        when: "File is uploaded"
+        def url = storageService.saveFile('test-bucket', 'integration-test.txt', 
+                                         inputStream, 'text/plain')
+        
+        then: "URL is generated"
+        url != null
+        
+        when: "File is downloaded"
+        def downloadedContent = storageService.s3Provider['test-bucket']['integration-test.txt'].text
+        
+        then: "Content matches"
+        downloadedContent == testContent
+        
+        cleanup:
+        storageService.deleteFile('test-bucket', 'integration-test.txt')
+    }
+}
+----
+
+== Best Practices
+
+=== Configuration Management
+
+* Use environment variables for credentials
+* Never commit secrets to version control
+* Use different providers for different environments (local for dev, S3 for production)
+
+[source,groovy]
+----
+environments {
+    development {
+        karman.providers.storage.provider = 'local'
+        karman.providers.storage.basePath = '/tmp/dev-storage'
+    }
+    production {
+        karman.providers.storage.provider = 's3'
+        karman.providers.storage.accessKey = System.getenv('S3_ACCESS_KEY')
+        karman.providers.storage.secretKey = System.getenv('S3_SECRET_KEY')
+    }
+}
+----
+
+=== Error Handling
+
+* Always check if files exist before accessing
+* Use try-catch blocks for cloud operations
+* Provide meaningful error messages to users
+* Log errors for debugging
+
+=== Performance
+
+* Use streaming for large files
+* Consider async uploads for better user experience
+* Implement caching for frequently accessed files
+* Use CDN for public content
