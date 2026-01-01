@@ -1,2 +1,2 @@
-include 'karman-core','karman-aws','karman-rackspace', 'karman-openstack', 'karman-grails', 'karman-openstack', 'karman-azure', 'karman-cifs', 'karman-nfs', 'karman-alibaba', 'karman-google', 'karman-differential'
+include 'karman-core','karman-aws','karman-rackspace', 'karman-openstack', 'karman-grails', 'karman-openstack', 'karman-azure', 'karman-cifs', 'karman-nfs', 'karman-alibaba', 'karman-google', 'karman-differential', 'karman-docs'
 
