@@ -1,0 +1,128 @@
+= Google Cloud Storage Provider
+:toc: left
+
+== Overview
+
+The Google Cloud Storage provider enables integration with Google Cloud Platform's object storage service.
+
+== Dependencies
+
+[source,groovy]
+----
+dependencies {
+    implementation 'cloud.wondrify:karman-core:{project-version}'
+    implementation 'cloud.wondrify:karman-google:{project-version}'
+}
+----
+
+== Configuration
+
+=== Service Account Authentication
+
+[source,groovy]
+----
+import com.bertramlabs.plugins.karman.StorageProvider
+
+def provider = StorageProvider.create(
+    provider: 'google',
+    clientEmail: 'service-account@project-id.iam.gserviceaccount.com',
+    privateKey: '''-----BEGIN PRIVATE KEY-----
+...your private key...
+-----END PRIVATE KEY-----''',
+    projectId: 'your-project-id'
+)
+----
+
+=== Configuration Options
+
+[cols="1,1,3"]
+|===
+|Option |Type |Description
+
+|clientEmail
+|String
+|Service account email address
+
+|privateKey
+|String
+|Service account private key (PEM format)
+
+|projectId
+|String
+|Google Cloud project ID
+
+|storageClass
+|String
+|Default storage class for new buckets
+|===
+
+== Usage Examples
+
+=== Basic Operations
+
+[source,groovy]
+----
+// Get bucket
+def bucket = provider['my-bucket']
+
+// Upload file
+bucket['example.txt'].text = 'Hello, Google Cloud!'
+bucket['example.txt'].save()
+
+// Set content type
+def file = bucket['image.png']
+file.contentType = 'image/png'
+file.bytes = imageBytes
+file.save()
+
+// Download file
+def content = bucket['example.txt'].text
+
+// List files
+bucket.listFiles().each { file ->
+    println "${file.name} - ${file.contentLength} bytes"
+}
+
+// Delete file
+bucket['old-file.txt'].delete()
+----
+
+=== Working with Metadata
+
+[source,groovy]
+----
+def file = bucket['document.pdf']
+file.setMetadata([
+    'department': 'Engineering',
+    'version': '2.0'
+])
+file.bytes = documentBytes
+file.save()
+
+// Retrieve metadata
+def metadata = file.getMetadata()
+println "Department: ${metadata['department']}"
+----
+
+=== Generating Signed URLs
+
+[source,groovy]
+----
+// Generate a signed URL valid for 1 hour
+def file = bucket['private-file.pdf']
+def signedUrl = file.getURL(3600)
+println "Signed URL: ${signedUrl}"
+----
+
+== Best Practices
+
+* Use service accounts with minimal required permissions
+* Store private keys securely (use environment variables or secret managers)
+* Choose appropriate storage classes based on access patterns:
+** STANDARD: Frequent access
+** NEARLINE: Access less than once per month
+** COLDLINE: Access less than once per quarter
+** ARCHIVE: Long-term archival
+* Enable versioning for important buckets
+* Use lifecycle policies for automatic data management
+* Consider using Cloud CDN for globally distributed content

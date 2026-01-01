@@ -1,0 +1,116 @@
+= Azure Blob Storage Provider
+:toc: left
+
+== Overview
+
+The Azure provider enables integration with Microsoft Azure Blob Storage and Azure File Storage. Karman supports both blob and file storage APIs.
+
+== Dependencies
+
+[source,groovy]
+----
+dependencies {
+    implementation 'cloud.wondrify:karman-core:{project-version}'
+    implementation 'cloud.wondrify:karman-azure:{project-version}'
+}
+----
+
+== Azure Blob Storage
+
+=== Configuration
+
+[source,groovy]
+----
+import com.bertramlabs.plugins.karman.StorageProvider
+
+// Azure Blob Storage
+def provider = StorageProvider.create(
+    provider: 'azure-pageblob',  // or 'azure-blockblob'
+    storageAccount: 'your-storage-account',
+    storageKey: 'your-storage-key',
+    protocol: 'https'
+)
+----
+
+=== Configuration Options
+
+[cols="1,1,3"]
+|===
+|Option |Type |Description
+
+|storageAccount
+|String
+|Azure storage account name
+
+|storageKey
+|String
+|Azure storage access key
+
+|protocol
+|String
+|Protocol (http or https, default: https)
+
+|baseEndpointDomain
+|String
+|Custom endpoint domain (default: core.windows.net)
+|===
+
+=== Usage Example
+
+[source,groovy]
+----
+// Get container
+def container = provider['my-container']
+
+// Upload file
+container['example.txt'].text = 'Hello, Azure!'
+container['example.txt'].save()
+
+// Download file
+def content = container['example.txt'].text
+
+// List files
+container.listFiles().each { file ->
+    println "${file.name} - ${file.contentLength} bytes"
+}
+----
+
+== Azure File Storage
+
+=== Configuration
+
+[source,groovy]
+----
+def provider = StorageProvider.create(
+    provider: 'azure-file',
+    storageAccount: 'your-storage-account',
+    storageKey: 'your-storage-key'
+)
+----
+
+=== Usage
+
+Azure File Storage provides SMB-compatible file shares in the cloud.
+
+[source,groovy]
+----
+// Get file share
+def share = provider['my-share']
+
+// Upload file
+share['documents/report.pdf'].bytes = pdfBytes
+share['documents/report.pdf'].save()
+
+// List files
+share.listFiles(prefix: 'documents/').each { file ->
+    println file.name
+}
+----
+
+== Best Practices
+
+* Use Blob Storage for object storage scenarios
+* Use File Storage for traditional file share requirements
+* Enable encryption at rest for sensitive data
+* Use shared access signatures (SAS) for temporary access
+* Configure lifecycle management policies for cost optimization

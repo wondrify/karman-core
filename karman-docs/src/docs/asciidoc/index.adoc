@@ -91,10 +91,13 @@ karman-core          # Core interfaces and abstractions
 
 === Next Steps
 
-* Learn about configuration options for each provider
-* Explore advanced features like streaming and metadata
-* Check out integration examples for popular frameworks
-* Review the API reference documentation
+* link:groovy-dsl.html[Learn the Groovy DSL] - Streaming, range access, and advanced usage
+* link:grails-plugin.html[Grails Plugin Integration] - Configuration and usage in Grails apps
+* Explore provider documentation:
+** link:providers-aws.html[AWS S3 Provider]
+** link:providers-azure.html[Azure Blob Storage Provider]
+** link:providers-google.html[Google Cloud Storage Provider]
+* Review provider-specific features and best practices
 
 == Getting Help
 
