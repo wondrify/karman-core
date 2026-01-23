@@ -181,10 +181,12 @@ public class DifferentialInputStream extends InputStream {
 
     public ManifestData.BlockData getNextBlockData() throws IOException {
         ManifestData.BlockData blockData = new ManifestData.BlockData();
-        byte[] blockDataBytes = new byte[ManifestData.BlockData.SIZE];
-        int bytesRead = sourceManifest.read(blockDataBytes);
+        byte[] blockDataBytes;
+        int bytesRead;
 
         if(manifestData.version == 1) {
+            blockDataBytes = new byte[44];
+            bytesRead = sourceManifest.read(blockDataBytes);
             if(bytesRead == -1) {
                 return null;
             } else if(bytesRead < 44) {
@@ -201,6 +203,8 @@ public class DifferentialInputStream extends InputStream {
 
             }
         } else if(manifestData.version == 2) {
+            blockDataBytes = new byte[48];
+            bytesRead = sourceManifest.read(blockDataBytes);
             if(bytesRead == -1) {
                 return null;
             } else if(bytesRead < 48) {
@@ -215,6 +219,8 @@ public class DifferentialInputStream extends InputStream {
                     }
                 }
             }
+        } else {
+            throw new IOException("Unsupported manifest version: " + manifestData.version);
         }
 
         long value = 0;
