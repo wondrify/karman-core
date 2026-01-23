@@ -181,22 +181,46 @@ public class DifferentialInputStream extends InputStream {
 
     public ManifestData.BlockData getNextBlockData() throws IOException {
         ManifestData.BlockData blockData = new ManifestData.BlockData();
-        byte[] blockDataBytes = new byte[ManifestData.BlockData.SIZE];
-        int bytesRead = sourceManifest.read(blockDataBytes);
-        if(bytesRead == -1) {
-            return null;
-        } else if(bytesRead < 44) {
-            //we have a problem and need to hold until the data is available
-            log.warn("Block Data Incomplete: " + bytesRead);
-            while(bytesRead < 44) {
-                int newBytesRead = sourceManifest.read(blockDataBytes, bytesRead, 44-bytesRead);
-                if(newBytesRead == -1) {
-                    throw new IOException("Unexpected EOF");
-                } else {
-                    bytesRead += newBytesRead;
+        byte[] blockDataBytes;
+        int bytesRead;
+
+        if(manifestData.version == 1) {
+            blockDataBytes = new byte[44];
+            bytesRead = sourceManifest.read(blockDataBytes);
+            if(bytesRead == -1) {
+                return null;
+            } else if(bytesRead < 44) {
+                //we have a problem and need to hold until the data is available
+                log.warn("Block Data Incomplete: " + bytesRead);
+                while(bytesRead < 44) {
+                    int newBytesRead = sourceManifest.read(blockDataBytes, bytesRead, 44-bytesRead);
+                    if(newBytesRead == -1) {
+                        throw new IOException("Unexpected EOF");
+                    } else {
+                        bytesRead += newBytesRead;
+                    }
+                }
+
+            }
+        } else if(manifestData.version == 2) {
+            blockDataBytes = new byte[48];
+            bytesRead = sourceManifest.read(blockDataBytes);
+            if(bytesRead == -1) {
+                return null;
+            } else if(bytesRead < 48) {
+                //we have a problem and need to hold until the data is available
+                log.warn("Block Data Incomplete: " + bytesRead);
+                while(bytesRead < 48) {
+                    int newBytesRead = sourceManifest.read(blockDataBytes, bytesRead, 48-bytesRead);
+                    if(newBytesRead == -1) {
+                        throw new IOException("Unexpected EOF");
+                    } else {
+                        bytesRead += newBytesRead;
+                    }
                 }
             }
-
+        } else {
+            throw new IOException("Unsupported manifest version: " + manifestData.version);
         }
         long value = 0;
         for (int i = 0; i < 8; i++) {
