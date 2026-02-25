@@ -101,8 +101,8 @@ karman-core          # Core interfaces and abstractions
 
 == Getting Help
 
-* GitHub Issues: https://github.com/bertramdev/karman-core
-* Documentation: https://github.com/bertramdev/karman-core/wiki
+* GitHub Issues: https://github.com/wondrify/karman-core
+* Documentation: https://wondrify.github.io/karman-core/
 
 == License
 
