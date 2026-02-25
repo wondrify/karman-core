@@ -257,7 +257,7 @@ public class DifferentialCloudFile extends CloudFile {
 						calculateDiffSize += 44l
 					}
 				}
-				OutputStream pos = localManifestCache.newOutputStream()
+				OutputStream pos = Files.newOutputStream(localManifestCache)
 				pos.write(headerString.getBytes())
 
 				BlockDigestStream dataStream = new BlockDigestStream(rawSourceStream, pos, manifestData.blockSize, diffInput)
@@ -311,12 +311,12 @@ public class DifferentialCloudFile extends CloudFile {
 
 
 					}
-					blockNumber++
-				}
-				pos.flush()
-				pos.close()
-				InputStream localFileStream = manifestLocalFile.newInputStream()
-				manifestFile.setInputStream(localFileStream)
+				blockNumber++
+			}
+			pos.flush()
+			pos.close()
+			InputStream localFileStream = Files.newInputStream(localManifestCache)
+			manifestFile.setInputStream(localFileStream)
 				manifestFile.save()
 				localFileStream.close()
 			} finally {
