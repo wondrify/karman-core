@@ -1,0 +1,109 @@
+= Karman Documentation
+:toc: left
+:toclevels: 3
+:source-highlighter: coderay
+:icons: font
+
+== Introduction
+
+Karman is a standardized Cloud Storage abstraction library for Groovy and Java. It provides a unified API for interacting with multiple cloud storage providers, making it easy to switch between providers or support multiple providers in your application.
+
+=== Key Features
+
+* *Provider Agnostic*: Write once, run on any supported cloud storage provider
+* *Groovy DSL*: Elegant and expressive syntax for cloud storage operations
+* *Java Compatible*: Fully usable from Java applications
+* *Multiple Providers*: Support for AWS S3, Azure Blob Storage, Google Cloud Storage, OpenStack, Rackspace, and more
+* *Local Storage*: Support for local file systems, CIFS, and NFS
+* *Streaming Support*: Efficient handling of large files with streaming capabilities
+
+=== Supported Providers
+
+Karman supports the following storage providers:
+
+* **AWS S3** - Amazon Web Services Simple Storage Service
+* **Azure Blob Storage** - Microsoft Azure cloud storage
+* **Google Cloud Storage** - Google Cloud Platform storage
+* **Alibaba Cloud OSS** - Alibaba Cloud Object Storage Service
+* **OpenStack Swift** - OpenStack object storage
+* **Rackspace Cloud Files** - Rackspace cloud storage
+* **Local File System** - Local disk storage
+* **CIFS/SMB** - Network file shares
+* **NFS** - Network File System
+
+=== Quick Start
+
+To get started with Karman, add the appropriate provider dependency to your project:
+
+[source,groovy]
+----
+dependencies {
+    implementation 'cloud.wondrify:karman-core:{project-version}'
+    implementation 'cloud.wondrify:karman-aws:{project-version}' // For AWS S3
+}
+----
+
+Basic usage example:
+
+[source,groovy]
+----
+import com.bertramlabs.plugins.karman.StorageProvider
+
+// Create a storage provider
+def provider = StorageProvider.create(
+    provider: 'aws',
+    accessKey: 'YOUR_ACCESS_KEY',
+    secretKey: 'YOUR_SECRET_KEY',
+    region: 'us-east-1'
+)
+
+// Get a bucket/container
+def bucket = provider['my-bucket']
+
+// Upload a file
+bucket['example.txt'].text = 'Hello, Karman!'
+
+// Read a file
+println bucket['example.txt'].text
+
+// List files
+bucket.listFiles().each { file ->
+    println file.name
+}
+----
+
+=== Architecture
+
+Karman follows a provider pattern where each cloud storage service is implemented as a separate module. The core library defines the common interfaces and abstractions, while provider-specific modules implement the details for each service.
+
+[source]
+----
+karman-core          # Core interfaces and abstractions
+├── karman-aws       # AWS S3 implementation
+├── karman-azure     # Azure Blob Storage
+├── karman-google    # Google Cloud Storage
+├── karman-alibaba   # Alibaba Cloud OSS
+├── karman-openstack # OpenStack Swift
+├── karman-rackspace # Rackspace Cloud Files
+├── karman-cifs      # CIFS/SMB support
+└── karman-nfs       # NFS support
+----
+
+=== Next Steps
+
+* link:groovy-dsl.html[Learn the Groovy DSL] - Streaming, range access, and advanced usage
+* link:grails-plugin.html[Grails Plugin Integration] - Configuration and usage in Grails apps
+* Explore provider documentation:
+** link:providers-aws.html[AWS S3 Provider]
+** link:providers-azure.html[Azure Blob Storage Provider]
+** link:providers-google.html[Google Cloud Storage Provider]
+* Review provider-specific features and best practices
+
+== Getting Help
+
+* GitHub Issues: https://github.com/bertramdev/karman-core
+* Documentation: https://github.com/bertramdev/karman-core/wiki
+
+== License
+
+Karman is open source software licensed under the Apache License 2.0.
