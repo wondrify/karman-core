@@ -1,0 +1,52 @@
+= Karman Release Notes
+:toc: left
+:toclevels: 2
+
+This page documents notable changes across Karman releases. For the full commit history, see the
+https://github.com/wondrify/karman-core[Karman GitHub repository].
+
+== 3.0.4
+
+Released 2026-04-22.
+
+=== New Features
+
+* *CloudFile range input stream support* — Added a ranged `getInputStream(Long startByte, Long endByte)`
+  API on the `CloudFile` abstraction so any provider can opt-in to HTTP range / partial reads.
+* *S3 ranged reads* — `S3CloudFile` now implements ranged input streams, issuing `Range` headers on
+  GET requests for efficient resumable and partial downloads.
+* *NFS ranged reads* — `NFSCloudFile` now supports ranged input streams when reading from NFS shares.
+* *CIFS ranged reads* — `CIFSCloudFile` now supports ranged input streams when reading from CIFS/SMB
+  shares.
+
+See link:groovy-dsl.html#range-based-access[Range-Based Access] for usage.
+
+=== Fixes
+
+* *S3 noProxy parsing* — `S3StorageProvider` now treats `|` (not `,`) as the delimiter for the
+  `noProxy` setting so entries are correctly matched against target hosts.
+* *Groovy static typing* — Resolved static-typing symbol resolution errors that surfaced when
+  consumers compiled Karman sources under Groovy 4 with `@CompileStatic`.
+* *Root project group* — Aligned the root project `group` with the subprojects so published
+  coordinates are consistent across all `karman-*` modules.
+
+=== Other
+
+* Plugin metadata updates.
+* Merged 3.0.3 fixes back into the 3.0.x line (#31).
+
+== 3.0.3
+
+* Fixed compilation errors in `karman-differential`.
+* Fixed `Path.newOutputStream()` calls to use `Files.newOutputStream()`.
+* Fixed `Path.newInputStream()` calls to use `Files.newInputStream()`.
+* Fixed release workflow to create the `build` directory before writing `BUILD_DATE.txt`.
+
+== 3.0.2
+
+* Fixed `karman-differential` compilation errors and bumped to 3.0.2.
+
+== 3.0.1
+
+* Fixed release workflows.
+* Updated documentation and links for the `wondrify` org.

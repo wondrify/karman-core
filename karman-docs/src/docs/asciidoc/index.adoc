@@ -91,6 +91,7 @@ karman-core          # Core interfaces and abstractions
 
 === Next Steps
 
+* link:release-notes.html[Release Notes] - What's new in each version
 * link:groovy-dsl.html[Learn the Groovy DSL] - Streaming, range access, and advanced usage
 * link:grails-plugin.html[Grails Plugin Integration] - Configuration and usage in Grails apps
 * Explore provider documentation:
