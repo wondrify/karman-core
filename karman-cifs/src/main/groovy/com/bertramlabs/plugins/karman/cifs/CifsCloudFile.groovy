@@ -218,4 +218,19 @@ class CifsCloudFile extends CloudFile {
     }
   }
 
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	InputStream getInputStream(long offset, long length) {
+		return new SmbRandomAccessFileInputStream(getCifsFile(), offset)
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	boolean supportsRangeBasedInputStream() {
+		return true
+	}
 }
