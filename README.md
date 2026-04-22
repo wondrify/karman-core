@@ -22,13 +22,9 @@ Modules:
 Documentation
 -------------
 
-Currently the majority of the documentation is in the Grails Plugin
+Full documentation is available on GitHub Pages:
 
-http://bertramdev.github.io/karman
-
-The Beginnings of a GroovyDoc area also available here:
-
-http://bertramdev.github.io/karman-core
+https://wondrify.github.io/karman-core/
 
 
 Contributions

@@ -19,7 +19,8 @@ sourceSets {
 
 
 dependencies {
-    implementation "org.apache.groovy:groovy-all:$groovyVersion"
+    implementation "org.apache.groovy:groovy:$groovyVersion"
+    implementation "org.apache.groovy:groovy-json:$groovyVersion"
 
     api project(':karman-core')
     testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
