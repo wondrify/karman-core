@@ -16,41 +16,6 @@ allprojects {
 
 ext {
 	publishedProjects = []
-    isBuildSnapshot = version.endsWith('-SNAPSHOT')
-    isReleaseVersion = !isBuildSnapshot
-}
-
-group = 'cloud.wondrify'
-
-
-if (isReleaseVersion) {
-    apply plugin: "io.github.gradle-nexus.publish-plugin"
-    nexusPublishing {
-        repositories {
-            sonatype {
-								nexusUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/service/local/"))
-                if(project.hasProperty('mavenUser')) {
-                    username = mavenDavydotcomUser
-                    password = mavenDavydotcomPassword
-                }   
-            }
-        }
-    }
-} else {
-	
-    publishing {
-        repositories {
-            maven {
-                url = "http://nexus.bertramlabs.com/content/repositories/snapshots"
-                if(project.hasProperty('labsNexusUser')) {
-                    credentials {
-                        username = labsNexusUser
-                        password = labsNexusPassword
-                    }
-                }
-            }
-        }
-    }
 }
 
 subprojects { project ->
