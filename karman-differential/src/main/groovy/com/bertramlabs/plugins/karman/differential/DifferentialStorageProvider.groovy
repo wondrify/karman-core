@@ -8,7 +8,7 @@ class DifferentialStorageProvider extends StorageProvider {
 
 	static String providerName = "differential"
 
-	Integer blockSize = 1024 * 1024 * 1 //1 megabytes per block
+	Integer blockSize = 1024 * 1024 * 4 //4 megabytes per block
 
 	StorageProvider sourceProvider
 
