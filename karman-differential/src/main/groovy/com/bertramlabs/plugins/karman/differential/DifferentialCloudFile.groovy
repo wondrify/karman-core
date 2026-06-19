@@ -25,6 +25,18 @@ public class DifferentialCloudFile extends CloudFile {
 	private DifferentialCloudFile linkedFile = null
 	private BoundedExecutor blockWriteExecutor = new BoundedExecutor(java.util.concurrent.Executors.newFixedThreadPool(4),4)
 	private Long onDeviceContentLength = null
+
+	/**
+	 * Optional dirty ranges for sparse-aware save. When set, blocks entirely outside these
+	 * ranges are assumed unchanged from the linked file and their manifest entries are copied
+	 * directly without reading or hashing the input data for those blocks.
+	 * Each range is a map with 'offset' (Long) and 'length' (Long) in bytes.
+	 */
+	private List<Map> dirtyRanges = null
+
+	void setDirtyRanges(List<Map> ranges) {
+		this.dirtyRanges = ranges
+	}
 	DifferentialCloudFile(String name, DifferentialDirectory parent, CloudFileInterface sourceFile) {
 		this.name = name
 		this.provider = parent.provider
@@ -227,10 +239,8 @@ public class DifferentialCloudFile extends CloudFile {
 				if(manifestFile.exists())
 					manifestFile.delete()
 
-				//we should write the manifest file to temp storage first in case of connection issues
 				Path localManifestCache = Files.createTempFile("karman",".diff")
 				manifestLocalFile = localManifestCache.toFile()
-				//todo: cleanup all sub files since we are overwriting the file
 				onDeviceContentLength = 0l
 				ManifestData manifestData = new ManifestData()
 				manifestData.fileSize = internalContentLength
@@ -256,55 +266,13 @@ public class DifferentialCloudFile extends CloudFile {
 					}
 
 				}
-				String headerString = manifestData.getHeader()
-				Long calculateDiffSize = 0
-				calculateDiffSize += headerString.getBytes().size()
-				if(internalContentLength) {
-					calculateDiffSize += ((long)((long)internalContentLength/(long)manifestData.blockSize)*44l)
-					if(((long)internalContentLength%(long)manifestData.blockSize) > 0) {
-						calculateDiffSize += 44l
-					}
+
+				// Use sparse-aware path when dirty ranges are provided and we have a linked file
+				if(dirtyRanges != null && diffInput != null && internalContentLength != null) {
+					saveSparseWithDirtyRanges(manifestData, diffInput, localManifestCache, manifestFile)
+				} else {
+					saveFullStream(manifestData, diffInput, localManifestCache, manifestFile)
 				}
-				OutputStream pos = localManifestCache.newOutputStream()
-				pos.write(headerString.getBytes())
-
-				BlockDigestStream dataStream = new BlockDigestStream(rawSourceStream, pos, manifestData.blockSize, diffInput)
-				byte[] buffer = new byte[manifestData.blockSize]
-				int bytesRead = 0
-				long blockNumber = 0
-
-
-				while((bytesRead = dataStream.read(buffer)) != -1) {
-					//confirm the buffer is not full of zero byte arrays
-
-					boolean allZero = true
-					for(byte b : buffer) {
-						if(b != 0) {
-							allZero = false
-							break
-						}
-					}
-
-					if(!allZero && dataStream.lastBlockDifferent) {
-
-						ByteArrayOutputStream compressedBuffer = new ByteArrayOutputStream()
-						GZIPOutputStream xz = new GZIPOutputStream(compressedBuffer)
-						//XZOutputStream xz = new XZOutputStream(compressedBuffer, new LZMA2Options(0), XZ.CHECK_NONE)
-						xz.write(buffer, 0, bytesRead)
-						xz.finish()
-						String blockFilePath = ManifestData.BlockData.getBlockPath(sourceFile, blockNumber, 0, manifestData);
-						byte[] data = compressedBuffer.toByteArray()
-						asyncWriteBlock(blockFilePath,data)
-						onDeviceContentLength += data.size()
-					}
-					blockNumber++
-				}
-				pos.flush()
-				pos.close()
-				InputStream localFileStream = manifestLocalFile.newInputStream()
-				manifestFile.setInputStream(localFileStream)
-				manifestFile.save()
-				localFileStream.close()
 			} finally {
 				if(diffInput != null) {
 					try {
@@ -322,6 +290,175 @@ public class DifferentialCloudFile extends CloudFile {
 		} else {
 			sourceFile.save(acl)
 		}
+	}
+
+	/**
+	 * Standard full-stream save: reads the entire input, hashes each block, stores changed blocks.
+	 */
+	@CompileStatic
+	private void saveFullStream(ManifestData manifestData, DifferentialInputStream diffInput, Path localManifestCache, CloudFileInterface manifestFile) {
+		String headerString = manifestData.getHeader()
+		OutputStream pos = localManifestCache.newOutputStream()
+		pos.write(headerString.getBytes())
+
+		BlockDigestStream dataStream = new BlockDigestStream(rawSourceStream, pos, manifestData.blockSize, diffInput)
+		byte[] buffer = new byte[manifestData.blockSize]
+		int bytesRead = 0
+		long blockNumber = 0
+
+		while((bytesRead = dataStream.read(buffer)) != -1) {
+			boolean allZero = true
+			for(byte b : buffer) {
+				if(b != 0) {
+					allZero = false
+					break
+				}
+			}
+
+			if(!allZero && dataStream.lastBlockDifferent) {
+				ByteArrayOutputStream compressedBuffer = new ByteArrayOutputStream()
+				GZIPOutputStream xz = new GZIPOutputStream(compressedBuffer)
+				xz.write(buffer, 0, bytesRead)
+				xz.finish()
+				String blockFilePath = ManifestData.BlockData.getBlockPath(sourceFile, blockNumber, 0, manifestData);
+				byte[] data = compressedBuffer.toByteArray()
+				asyncWriteBlock(blockFilePath,data)
+				onDeviceContentLength += data.size()
+			}
+			blockNumber++
+		}
+		pos.flush()
+		pos.close()
+		InputStream localFileStream = localManifestCache.toFile().newInputStream()
+		manifestFile.setInputStream(localFileStream)
+		manifestFile.save()
+		localFileStream.close()
+	}
+
+	/**
+	 * Sparse-aware save: only reads and hashes blocks that overlap with dirty ranges.
+	 * Blocks entirely outside dirty ranges are assumed unchanged from the linked file —
+	 * their manifest entries are copied with fileIndex incremented.
+	 */
+	@CompileStatic
+	private void saveSparseWithDirtyRanges(ManifestData manifestData, DifferentialInputStream diffInput, Path localManifestCache, CloudFileInterface manifestFile) {
+		int blockSize = manifestData.blockSize
+		long fileSize = internalContentLength.longValue()
+		long totalBlocks = (long)((fileSize + (long)blockSize - 1L).intdiv((long)blockSize))
+
+		String headerString = manifestData.getHeader()
+		OutputStream pos = localManifestCache.newOutputStream()
+		pos.write(headerString.getBytes())
+
+		// Pre-compute which blocks are dirty
+		BitSet dirtyBlockMap = new BitSet((int)totalBlocks)
+		for(Map range : dirtyRanges) {
+			long rangeOffset = ((Number)range.get("offset")).longValue()
+			long rangeLength = ((Number)range.get("length")).longValue()
+			long startBlock = (long)(rangeOffset.intdiv((long)blockSize))
+			long endBlock = (long)((rangeOffset + rangeLength - 1L).intdiv((long)blockSize))
+			for(long b = startBlock; b <= endBlock && b < totalBlocks; b++) {
+				dirtyBlockMap.set((int)b)
+			}
+		}
+
+		// Read linked file's block manifest entries
+		List<ManifestData.BlockData> linkedBlocks = new ArrayList<ManifestData.BlockData>((int)totalBlocks)
+		for(int i = 0; i < totalBlocks; i++) {
+			ManifestData.BlockData bd = diffInput.getNextBlockData()
+			linkedBlocks.add(bd)
+		}
+
+		// Process each block
+		byte[] buffer = new byte[blockSize]
+		java.security.MessageDigest shaDigest
+		try {
+			shaDigest = java.security.MessageDigest.getInstance("SHA3-224")
+		} catch(java.security.NoSuchAlgorithmException e) {
+			shaDigest = java.security.MessageDigest.getInstance("SHA-256")
+		}
+
+		for(long blockNumber = 0; blockNumber < totalBlocks; blockNumber++) {
+			int currentBlockSize = (int)Math.min((long)blockSize, fileSize - (blockNumber * (long)blockSize))
+
+			if(!dirtyBlockMap.get((int)blockNumber) && linkedBlocks[(int)blockNumber] != null) {
+				// Clean block: copy manifest entry from linked file with incremented fileIndex
+				ManifestData.BlockData linkedBlock = linkedBlocks[(int)blockNumber]
+				ManifestData.BlockData newBlock = new ManifestData.BlockData()
+				newBlock.block = blockNumber
+				newBlock.blockSize = linkedBlock.blockSize
+				newBlock.hash = linkedBlock.hash
+				newBlock.fileIndex = linkedBlock.fileIndex + 1
+				pos.write(newBlock.generateBytes())
+
+				// Skip this block's worth of data from the input stream
+				long toSkip = currentBlockSize
+				while(toSkip > 0) {
+					long skipped = rawSourceStream.skip(toSkip)
+					if(skipped <= 0) {
+						int toRead = (int)Math.min(toSkip, (long)buffer.length)
+						int read = rawSourceStream.read(buffer, 0, toRead)
+						if(read <= 0) break
+						toSkip -= read
+					} else {
+						toSkip -= skipped
+					}
+				}
+			} else {
+				// Dirty block: read, hash, and potentially store
+				int offset = 0
+				while(offset < currentBlockSize) {
+					int read = rawSourceStream.read(buffer, offset, currentBlockSize - offset)
+					if(read == -1) break
+					offset += read
+				}
+				int bytesRead = offset
+
+				boolean allZero = true
+				for(int i = 0; i < bytesRead; i++) {
+					if(buffer[i] != 0) { allZero = false; break }
+				}
+
+				shaDigest.reset()
+				shaDigest.update(buffer, 0, bytesRead)
+				byte[] hash = shaDigest.digest()
+
+				ManifestData.BlockData newBlock = new ManifestData.BlockData()
+				newBlock.block = blockNumber
+				newBlock.blockSize = bytesRead
+				newBlock.hash = allZero ? new byte[hash.length] : hash
+				newBlock.fileIndex = 0
+
+				// Check if hash matches linked block
+				if(!allZero && linkedBlocks[(int)blockNumber] != null) {
+					ManifestData.BlockData linkedBlock = linkedBlocks[(int)blockNumber]
+					if(Arrays.equals(hash, linkedBlock.hash)) {
+						newBlock.fileIndex = linkedBlock.fileIndex + 1
+					}
+				}
+
+				pos.write(newBlock.generateBytes())
+
+				// Store block data if changed
+				if(!allZero && newBlock.fileIndex == 0) {
+					ByteArrayOutputStream compressedBuffer = new ByteArrayOutputStream()
+					GZIPOutputStream gzOut = new GZIPOutputStream(compressedBuffer)
+					gzOut.write(buffer, 0, bytesRead)
+					gzOut.finish()
+					String blockFilePath = ManifestData.BlockData.getBlockPath(sourceFile, blockNumber, 0, manifestData)
+					byte[] data = compressedBuffer.toByteArray()
+					asyncWriteBlock(blockFilePath, data)
+					onDeviceContentLength += data.size()
+				}
+			}
+		}
+
+		pos.flush()
+		pos.close()
+		InputStream localFileStream = localManifestCache.toFile().newInputStream()
+		manifestFile.setInputStream(localFileStream)
+		manifestFile.save()
+		localFileStream.close()
 	}
 
 	private Date saturactionNotify = null
