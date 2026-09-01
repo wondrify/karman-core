@@ -67,6 +67,10 @@ subprojects { project ->
     afterEvaluate {
         signing {
             required { isReleaseVersion && gradle.taskGraph.hasTask("publish") }
+            def signingKey = findProperty("signing.key")
+            if (signingKey) {
+                useInMemoryPgpKeys(findProperty("signing.keyId"), signingKey, findProperty("signing.password"))
+            }
             sign publishing.publications.maven
         }
     }
