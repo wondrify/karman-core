@@ -3,6 +3,7 @@ package com.bertramlabs.plugins.karman.nfs
 import com.bertramlabs.plugins.karman.CloudFile
 import com.bertramlabs.plugins.karman.Directory
 import com.bertramlabs.plugins.karman.util.Mimetypes
+import com.emc.ecs.nfsclient.nfs.NfsWriteRequest
 import com.emc.ecs.nfsclient.nfs.io.Nfs3File
 import com.emc.ecs.nfsclient.nfs.io.NfsFileOutputStream
 import groovy.transform.CompileStatic
@@ -43,7 +44,7 @@ class NfsCloudFile extends CloudFile{
 		if(!baseFile.exists()) {
 			baseFile.createNewFile()
 		}
-		return new NfsFileOutputStream(baseFile)
+		return new NfsFileOutputStream(baseFile, NfsWriteRequest.UNSTABLE)
 	}
 
 	@Override
