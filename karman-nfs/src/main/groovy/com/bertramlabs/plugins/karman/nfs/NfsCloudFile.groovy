@@ -142,7 +142,7 @@ class NfsCloudFile extends CloudFile{
 	def delete() {
 		if(baseFile.exists()) {
 			if(baseFile.isDirectory()) {
-				parent.listFiles(prefix: baseFile.name + "/",delimiter: "/")?.each { subFile ->
+				parent.listFiles(prefix: name + "/",delimiter: "/")?.each { subFile ->
 					subFile.delete()
 				}
 				if(baseFile.exists()) {
